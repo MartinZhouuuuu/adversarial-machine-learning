@@ -18,6 +18,8 @@ image_channels = 1
 image_shape = (image_rows, image_columns, image_channels)
 latent_dim = 100
 batch_size = 32
+
+
 def build_generator(latent_dim,image_shape):
 	model = Sequential()
 	model.add(Dense(64,input_shape = (latent_dim,)))
@@ -67,17 +69,20 @@ def combined_loss(generated,beta,power):
 def fenceGAN():
 	discrimintator = build_discrimintator(image_shape)
 	generator = build_generator(latent_dim,image_shape)
-
+	#combined model
 	z = Input(shape = (latent_dim,))
 	fake_result = generator(z)
 	discrimintator.trainable = False
 	validity = discrimintator(fake_result)
 	combined_model = Model(z,validity)
+	
+	# here  the beta value is set to 15
 	combined_model.compile(loss = combined_loss(fake_result,15,2),
 		optimizer = 'adam')
 	return combined_model
 
 def train(GAN, G, D, epochs, v_freq=10):
+	
 	train_datagen = ImageDataGenerator(
 		rescale = 1./255
 		)
@@ -86,35 +91,45 @@ def train(GAN, G, D, epochs, v_freq=10):
 		target_size = (3,3),
 		batch_size = 32,
 		class_mode = 'binary',
-		color_mode = 'grayscale'
+		color_mode = 'grayscale',
+		classes = ['dirty','clean']
 		)
 	discrimintator = build_discrimintator(image_shape)
 	generator = build_generator(latent_dim,image_shape)
 	GAN = fenceGAN()
-	noise = np.random.normal(0.5,0.5,(2000,100))
+	
+	noise = np.random.normal(0.5,0.5,(2000,latent_dim))
 	d_loss = np.empty((0,1))
 	g_loss = np.empty((0,1))
 
 	for epoch in range(epochs):
+		#train discriminator using fit_generator
 		history = discrimintator.fit_generator(
 		train_generator,
 		steps_per_epoch = 50,
 		epochs = 1
 		)
+		#keep a record of discriminator loss
 		history_array = np.array([history.history['loss']])
 		d_loss = np.append(d_loss,history_array,axis=0)
 		
 		fake_label = np.zeros(2000)
 		fake_label[:] = 0.5
-		
+		#train generator using train_on_batch
 		generator_loss = GAN.train_on_batch(noise,fake_label)
 		print(generator_loss)
+		#keep a record of generator loss
 		g_loss_array = np.array([[generator_loss]])
 		g_loss = np.append(g_loss,g_loss_array,axis = 0)
 
 	print(d_loss)
 	print(g_loss)
 	fake_generated = generator.predict(noise)
+	validity_g = discrimintator.predict(fake_generated)
+	print(validity_g)
+	validity_d = discrimintator.predict_generator(train_generator,steps = 50)
+	print(validity_d)
+
 	for x in range(fake_generated.shape[0]):
 		plt.imshow(fake_generated[x].reshape(3,3),cmap = 'gray')
 		#plt.imshow(fake_generated[0])
@@ -123,6 +138,6 @@ def train(GAN, G, D, epochs, v_freq=10):
 G = build_generator(latent_dim,image_shape)
 D = build_discrimintator(image_shape)
 GAN = fenceGAN()
-train(GAN, G, D,10)
+train(GAN, G, D,5)
 K.clear_session()
 
