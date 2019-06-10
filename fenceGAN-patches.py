@@ -10,21 +10,23 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.losses import binary_crossentropy
 import tensorflow as tf
 from keras.preprocessing.image import ImageDataGenerator
-image_rows = 32
-image_columns = 32
-image_channels = 3
+image_rows = 3
+image_columns = 3
+image_channels = 1
 image_shape = (image_rows, image_columns, image_channels)
 latent_dim = 100
 batch_size = 32
 def build_generator(latent_dim,image_shape):
 	model = Sequential()
-	model.add(Dense(256,input_shape = (latent_dim,)))
+	model.add(Dense(64,input_shape = (latent_dim,)))
 	model.add(LeakyReLU(alpha = 0.2))
-	model.add(BatchNormalization())
+	
 
-	model.add(Dense(512))
+	model.add(Dense(32))
 	model.add(LeakyReLU(alpha = 0.2))
-	model.add(BatchNormalization())
+
+	model.add(Dense(16))
+	model.add(LeakyReLU(alpha = 0.2))
 
 	model.add(Dense(np.prod(image_shape), activation = 'sigmoid'))
 	model.add(Reshape(image_shape))
@@ -35,10 +37,10 @@ def build_generator(latent_dim,image_shape):
 def build_discrimintator(image_shape):
 	model = Sequential()
 	model.add(Flatten(input_shape = image_shape))
-	model.add(Dense(256))
+	model.add(Dense(16))
 	model.add(LeakyReLU(alpha = 0.2))
 
-	model.add(Dense(128))
+	model.add(Dense(32))
 	model.add(LeakyReLU(alpha = 0.2))
 
 	model.add(Dense(1,activation =  'sigmoid'))
@@ -59,6 +61,7 @@ def combined_loss(generated,beta,power):
 		loss = encirclement_loss + beta*dispersion_loss
 		return loss
 	return generator_loss
+
 def fenceGAN():
 	discrimintator = build_discrimintator(image_shape)
 	generator = build_generator(latent_dim,image_shape)
@@ -78,10 +81,10 @@ def train(GAN, G, D, epochs, v_freq=10):
 		)
 	train_generator = train_datagen.flow_from_directory(
 		'patches',
-		target_size = (32,32),
-		batch_size = 16,
+		target_size = (3,3),
+		batch_size = 32,
 		class_mode = 'binary',
-		color_mode = 'rgb'
+		color_mode = 'grayscale'
 		)
 	discrimintator = build_discrimintator(image_shape)
 	generator = build_generator(latent_dim,image_shape)
@@ -100,25 +103,14 @@ def train(GAN, G, D, epochs, v_freq=10):
 
 	
 	fake_generated = generator.predict(noise)
-	validity = GAN.predict(noise)
+	validity = discrimintator.predict(fake_generated)
 	print(validity)
-	for x in range(10):
-		plt.imshow(fake_generated[x])
+	for x in range(fake_generated.shape[0]):
+		plt.imshow(fake_generated[x].reshape(3,3),cmap = 'gray')
+		#plt.imshow(fake_generated[0])
 		plt.savefig('image/%d.png'%x)
 
 G = build_generator(latent_dim,image_shape)
 D = build_discrimintator(image_shape)
 GAN = fenceGAN()
-train(GAN, G, D, 300)
-
-
-
-
-
-
-
-
-
-
-
-
+train(GAN, G, D, 1)
