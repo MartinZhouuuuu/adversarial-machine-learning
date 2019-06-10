@@ -62,9 +62,13 @@ def combined_loss(generated,beta,power):
 		avg_distance = tf.reduce_mean(tf.pow(distance, 1/power))
 		dispersion_loss = tf.reciprocal(avg_distance)
 		
-		loss = encirclement_loss + beta*dispersion_loss
+		loss = 10*encirclement_loss + beta*dispersion_loss
 		return loss
 	return generator_loss
+
+
+
+
 
 def fenceGAN():
 	discrimintator = build_discrimintator(image_shape)
@@ -82,7 +86,6 @@ def fenceGAN():
 	return combined_model
 
 def train(GAN, G, D, epochs, v_freq=10):
-	
 	train_datagen = ImageDataGenerator(
 		rescale = 1./255
 		)
@@ -121,19 +124,20 @@ def train(GAN, G, D, epochs, v_freq=10):
 		#keep a record of generator loss
 		g_loss_array = np.array([[generator_loss]])
 		g_loss = np.append(g_loss,g_loss_array,axis = 0)
-
+		fake_generated = generator.predict(noise)
+		validity_g = discrimintator.predict(fake_generated)
+		print(validity_g)
+		validity_d = discrimintator.predict_generator(train_generator,steps = 50)
+		print(validity_d)
+	
 	print(d_loss)
 	print(g_loss)
-	fake_generated = generator.predict(noise)
-	validity_g = discrimintator.predict(fake_generated)
-	print(validity_g)
-	validity_d = discrimintator.predict_generator(train_generator,steps = 50)
-	print(validity_d)
+	
 
-	for x in range(fake_generated.shape[0]):
+	'''for x in range(fake_generated.shape[0]):
 		plt.imshow(fake_generated[x].reshape(3,3),cmap = 'gray')
 		#plt.imshow(fake_generated[0])
-		plt.savefig('image/%d.png'%x)
+		plt.savefig('image/%d.png'%x)'''
 
 G = build_generator(latent_dim,image_shape)
 D = build_discrimintator(image_shape)
