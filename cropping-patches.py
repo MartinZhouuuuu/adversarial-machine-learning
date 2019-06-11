@@ -38,4 +38,4 @@ def crop_images(path,filter_size,stride):
 
 				patch_count += 1
 
-crop_images('350-MNIST-images/*.jpg',(3,3),1)
+crop_images('100-MNIST-images/*.jpg',(5,5),1)
