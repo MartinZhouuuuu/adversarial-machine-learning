@@ -96,30 +96,31 @@ def train(GAN, G, D, epochs):
 	g_loss_array = np.empty((0,1))
 
 	for epoch in range(epochs):
-		for iteration in range(57600//32):
+		for iteration in range(2000//32):
 			real_index = np.random.randint(0,57600,32)
 			fake_index = np.random.randint(0,2000,32)
-			
-			#train discriminator
 			batch_noise = noise[fake_index]
 			noise_label = np.zeros(32)
 			batch_real = clean_dataset[real_index]
 			real_label = np.ones(32)
+			half_label = np.zeros(32)
+			half_label[:] = 0.5
+			
+			#train generator 
+			g_loss = GAN.train_on_batch(batch_noise,half_label)
+		
+			#keep a record of generator loss
+			g_loss_array = np.append(g_loss_array,np.array([[g_loss]]),axis = 0)
+
+
+			#train discriminator
+			
 			fake_generated_1 = G.predict(batch_noise)
 			d_loss_1 = D.train_on_batch(fake_generated_1,noise_label)
 			d_loss_2 = D.train_on_batch(batch_real,real_label)
 		
 			d_loss = 0.5*d_loss_1 + 0.5*d_loss_2
 			d_loss_array = np.append(d_loss_array,np.array([[d_loss]]),axis=0)
-		
-			for k in range(10):
-				half_label = np.zeros(32)
-				half_label[:] = 0.5
-				#train generator 
-				g_loss = GAN.train_on_batch(batch_noise,half_label)
-			
-				#keep a record of generator loss
-				g_loss_array = np.append(g_loss_array,np.array([[g_loss]]),axis = 0)
 		
 		print('d_loss: %f'%d_loss)
 		print('g_loss: %f'%g_loss)
@@ -136,12 +137,9 @@ def train(GAN, G, D, epochs):
 		plt.imshow(fake_generated_2[x].reshape(3,3),cmap = 'gray')
 		plt.savefig('image/%d.png'%x)'''
 
-
-
-
-
 G = build_generator(latent_dim,image_shape)
 D = build_discriminator(image_shape)
 GAN = fenceGAN(G,D)
 train(GAN, G, D,5)
+
 K.clear_session()
