@@ -25,7 +25,6 @@ def build_generator(latent_dim,image_shape):
 	model.add(Dense(64,input_shape = (latent_dim,)))
 	model.add(LeakyReLU(alpha = 0.2))
 	
-
 	model.add(Dense(32))
 	model.add(LeakyReLU(alpha = 0.2))
 
@@ -38,7 +37,7 @@ def build_generator(latent_dim,image_shape):
 
 
 
-def build_discrimintator(image_shape):
+def build_discriminator(image_shape):
 	model = Sequential()
 	model.add(Flatten(input_shape = image_shape))
 	model.add(Dense(16))
@@ -62,30 +61,25 @@ def combined_loss(generated,beta,power):
 		avg_distance = tf.reduce_mean(tf.pow(distance, 1/power))
 		dispersion_loss = tf.reciprocal(avg_distance)
 		
-		loss = 10*encirclement_loss + beta*dispersion_loss
+		loss = encirclement_loss + beta*dispersion_loss
 		return loss
 	return generator_loss
 
 
-
-
-
-def fenceGAN():
-	discrimintator = build_discrimintator(image_shape)
-	generator = build_generator(latent_dim,image_shape)
+def fenceGAN(G,D):
 	#combined model
 	z = Input(shape = (latent_dim,))
-	fake_result = generator(z)
-	discrimintator.trainable = False
-	validity = discrimintator(fake_result)
+	fake_result = G(z)
+	D.trainable = False
+	validity = D(fake_result)
 	combined_model = Model(z,validity)
-	
 	# here  the beta value is set to 15
-	combined_model.compile(loss = combined_loss(fake_result,15,2),
+	combined_model.compile(loss = combined_loss(fake_result,1,2),
 		optimizer = 'adam')
 	return combined_model
 
-def train(GAN, G, D, epochs, v_freq=10):
+
+def train(GAN, G, D, epochs):
 	train_datagen = ImageDataGenerator(
 		rescale = 1./255
 		)
@@ -97,42 +91,47 @@ def train(GAN, G, D, epochs, v_freq=10):
 		color_mode = 'grayscale',
 		classes = ['dirty','clean']
 		)
-	discrimintator = build_discrimintator(image_shape)
-	generator = build_generator(latent_dim,image_shape)
-	GAN = fenceGAN()
 	
-	noise = np.random.normal(0.5,0.5,(2000,latent_dim))
-	d_loss = np.empty((0,1))
-	g_loss = np.empty((0,1))
-
+	noise = np.random.normal(0.5,0.5,(20000,latent_dim))
+	d_loss_array = np.empty((0,1))
+	g_loss_array = np.empty((0,1))
+	fake_generated_2 = G.predict(noise)
+	validity_g = D.predict(fake_generated_2)
+	print(validity_g)
+		
 	for epoch in range(epochs):
 		#train discriminator using fit_generator
-		history = discrimintator.fit_generator(
+		history = D.fit_generator(
 		train_generator,
 		steps_per_epoch = 50,
 		epochs = 1
 		)
-		#keep a record of discriminator loss
-		history_array = np.array([history.history['loss']])
-		d_loss = np.append(d_loss,history_array,axis=0)
+		d_loss_1 = history.history['loss'][0]
+
+		fake_generated_1 = G.predict(noise)
+		fake_label_for_d = np.zeros(20000)
+		d_loss_2 = D.train_on_batch(fake_generated_1,fake_label_for_d)
 		
-		fake_label = np.zeros(2000)
-		fake_label[:] = 0.5
-		#train generator using train_on_batch
-		generator_loss = GAN.train_on_batch(noise,fake_label)
-		print(generator_loss)
-		#keep a record of generator loss
-		g_loss_array = np.array([[generator_loss]])
-		g_loss = np.append(g_loss,g_loss_array,axis = 0)
-		fake_generated = generator.predict(noise)
-		validity_g = discrimintator.predict(fake_generated)
+		fake_generated_2 = G.predict(noise)
+		validity_g = D.predict(fake_generated_2)
 		print(validity_g)
-		validity_d = discrimintator.predict_generator(train_generator,steps = 50)
-		print(validity_d)
-	
-	print(d_loss)
-	print(g_loss)
-	
+		
+		d_loss = 0.5*d_loss_1 +0.5*d_loss_2
+		d_loss_array = np.append(d_loss_array,np.array([[d_loss]]),axis=0)
+		
+		fake_label_for_g = np.zeros(20000)
+		fake_label_for_g[:] = 0.5
+		#train generator using train_on_batch
+		g_loss = GAN.train_on_batch(noise,fake_label_for_g)
+		
+		#keep a record of generator loss
+		g_loss_array = np.append(g_loss_array,np.array([[g_loss]]),axis = 0)
+		fake_generated_2 = G.predict(noise)
+		validity_g = D.predict(fake_generated_2)
+		print(validity_g)
+		
+		#validity_d = D.predict_generator(train_generator,steps = 50)
+		#print(validity_d)
 
 	'''for x in range(fake_generated.shape[0]):
 		plt.imshow(fake_generated[x].reshape(3,3),cmap = 'gray')
@@ -140,8 +139,7 @@ def train(GAN, G, D, epochs, v_freq=10):
 		plt.savefig('image/%d.png'%x)'''
 
 G = build_generator(latent_dim,image_shape)
-D = build_discrimintator(image_shape)
-GAN = fenceGAN()
+D = build_discriminator(image_shape)
+GAN = fenceGAN(G,D)
 train(GAN, G, D,5)
 K.clear_session()
-
