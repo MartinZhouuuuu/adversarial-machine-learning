@@ -86,13 +86,13 @@ def train(GAN, G, D, epochs):
 	train_generator = train_datagen.flow_from_directory(
 		'patches',
 		target_size = (3,3),
-		batch_size = 32,
+		batch_size = 1600,
 		class_mode = 'binary',
 		color_mode = 'grayscale',
 		classes = ['dirty','clean']
 		)
 	
-	noise = np.random.normal(0.5,0.5,(20000,latent_dim))
+	noise = np.random.normal(0.5,0.5,(2000,latent_dim))
 	d_loss_array = np.empty((0,1))
 	g_loss_array = np.empty((0,1))
 	fake_generated_2 = G.predict(noise)
@@ -103,13 +103,13 @@ def train(GAN, G, D, epochs):
 		#train discriminator using fit_generator
 		history = D.fit_generator(
 		train_generator,
-		steps_per_epoch = 50,
+		steps_per_epoch = 1,
 		epochs = 1
 		)
 		d_loss_1 = history.history['loss'][0]
 
 		fake_generated_1 = G.predict(noise)
-		fake_label_for_d = np.zeros(20000)
+		fake_label_for_d = np.zeros(2000)
 		d_loss_2 = D.train_on_batch(fake_generated_1,fake_label_for_d)
 		
 		fake_generated_2 = G.predict(noise)
@@ -119,7 +119,7 @@ def train(GAN, G, D, epochs):
 		d_loss = 0.5*d_loss_1 +0.5*d_loss_2
 		d_loss_array = np.append(d_loss_array,np.array([[d_loss]]),axis=0)
 		
-		fake_label_for_g = np.zeros(20000)
+		fake_label_for_g = np.zeros(2000)
 		fake_label_for_g[:] = 0.5
 		#train generator using train_on_batch
 		g_loss = GAN.train_on_batch(noise,fake_label_for_g)
