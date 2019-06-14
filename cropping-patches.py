@@ -32,7 +32,7 @@ def crop_images(path,filter_size,stride):
 				vertical_start_point:vertical_end_point]
 				
 				#write image to a directory
-				cv2.imwrite('patches/clean/%d.jpg'%
+				cv2.imwrite('patches/clean/%d.png'%
 					(patch_count),
 					crop_image)
 
