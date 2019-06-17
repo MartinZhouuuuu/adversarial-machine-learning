@@ -1,6 +1,6 @@
-import cv2
+import tifffile
 import glob
-import os
+import cv2
 '''
 Crops small patches from an image
 Arguments:
@@ -10,7 +10,7 @@ Arguments:
 '''
 def crop_images(path,filter_size,stride):
 	#read in images
-	images = [cv2.imread(file) for file in glob.glob(path)]
+	images = [cv2.imread(file, 0) for file in glob.glob(path)]
 	patch_count = 0
 	for image in images:
 
@@ -32,7 +32,7 @@ def crop_images(path,filter_size,stride):
 				vertical_start_point:vertical_end_point]
 				
 				#write image to a directory
-				cv2.imwrite('patches/clean/%d.png'%
+				tifffile.imsave('patches/clean/%d.tif'%
 					(patch_count),
 					crop_image)
 

@@ -10,6 +10,7 @@ from keras.preprocessing.image import load_img, img_to_array, array_to_img
 import tensorflow as tf
 from keras import backend as K
 from custom_losses import *
+import tifffile
 '''fenceGAN implementation
 author@chengyang
 '''
@@ -28,14 +29,14 @@ class fenceGAN():
 		self.g_loss_array = np.empty((0,1))
 		self.num_of_patches = 57600
 		self.num_of_noise = 2000
-		self.clean_dataset = self.get_dataset(self.num_of_patches,'patches/clean/%d.png')
+		self.clean_dataset = self.get_dataset(self.num_of_patches,'patches/clean/%d.tif')
 		self.noise = np.random.normal(0.5,0.5,(self.num_of_noise,self.latent_dim))
 
 	def get_dataset(self, num_of_patches,path):
 		dataset = np.empty((0,5,5,1))
 		for patch_id in range(num_of_patches):
-			img = load_img(path
-				%patch_id,color_mode = 'grayscale')
+			img = tifffile.imread(path
+				%patch_id)
 			img_array = img_to_array(img)
 			dataset = np.append(dataset,[img_array],axis = 0)
 		return dataset
@@ -63,6 +64,12 @@ class fenceGAN():
 	def build_discriminator(self):
 		model = Sequential()
 		model.add(Flatten(input_shape = self.image_shape))
+		model.add(Dense(16))
+		model.add(LeakyReLU(alpha = 0.4))
+
+		model.add(Dense(8))
+		model.add(LeakyReLU(alpha = 0.4))
+
 		model.add(Dense(4))
 		model.add(LeakyReLU(alpha = 0.4))
 
@@ -133,7 +140,6 @@ class fenceGAN():
 				for k in range(2):
 					g_loss_k = self.GAN.train_on_batch(batch_noise_g,half_label)
 					g_loss += g_loss_k*0.5
-				g_loss /=10
 				
 			
 				#record generator loss
@@ -146,14 +152,14 @@ class fenceGAN():
 		batch_real = self.clean_dataset[real_index]
 		
 		validity_d = self.D.predict(batch_real)
-		print(validity_d)
+		
 		
 		#get batch of noise
 		fake_index = np.random.randint(0,self.num_of_noise,self.batch_size)
 		batch_noise = self.noise[fake_index]
 
 		validity_g = self.GAN.predict(batch_noise)
-		print(validity_g)
+		
 
 		
 	def plot_losses(self):
@@ -170,7 +176,7 @@ class fenceGAN():
 		generated_patches = self.G.predict(self.noise)
 		for x in range(generated_patches.shape[0]):
 			plt.imshow(generated_patches[x].reshape(5,5),cmap = 'gray')
-			plt.savefig('generated-patches/%d.png'%x)
+			plt.savefig('generated-patches/%d.tif'%x)
 			plt.close()
 
 	def save_model(self):
@@ -178,16 +184,16 @@ class fenceGAN():
 		self.D.save('model-files/D.h5')
 
 	def predict_on_patches(self):
-		test_dataset = self.get_dataset(5760,'for-prediction/dirty-patches-test/%d.png')
+		test_dataset = self.get_dataset(576,'patches-for-prediction/dirty-patches-test/%d.tif')
 		# predictor = load_model('model-files/D.h5')
 		predictor = self.D
 		predictions = predictor.predict(test_dataset)
-		print(predictions)
+		
 
 
 fenceGAN = fenceGAN()
 fenceGAN.pretrain()
-fenceGAN.train(20)
+fenceGAN.train(10)
 fenceGAN.report_scores()
 fenceGAN.plot_losses()
 fenceGAN.save_model()
