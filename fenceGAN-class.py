@@ -54,7 +54,8 @@ class fenceGAN():
 		model.add(LeakyReLU(alpha = 0.4))
 		model.add(BatchNormalization(momentum = 0.8))
 
-		model.add(Dense(np.prod(self.image_shape), activation = 'sigmoid'))
+		model.add(Dense(np.prod(self.image_shape)))
+		model.add(LeakyReLU(alpha = 0.4))
 		model.add(Reshape(self.image_shape))
 		return model
 
@@ -83,7 +84,7 @@ class fenceGAN():
 		validity = self.D(fake_result)
 		combined_model = Model(z,validity)
 		#here  the beta value is set to 15
-		combined_model.compile(loss = combined_loss(fake_result,10,2),
+		combined_model.compile(loss = combined_loss(fake_result,20,2),
 			optimizer = 'rmsprop')
 		return combined_model
 	def pretrain(self):
@@ -188,7 +189,7 @@ fenceGAN = fenceGAN()
 fenceGAN.pretrain()
 fenceGAN.train(20)
 fenceGAN.report_scores()
-# fenceGAN.plot_losses()
+fenceGAN.plot_losses()
 fenceGAN.save_model()
-# fenceGAN.save_generated_images()
+fenceGAN.save_generated_images()
 fenceGAN.predict_on_patches()
