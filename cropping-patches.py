@@ -10,11 +10,9 @@ Arguments:
 '''
 def crop_images(path,filter_size,stride):
 	#read in images
-	images = [cv2.imread(file, 0) for file in glob.glob(path)]
+	images = [tifffile.imread(file) for file in glob.glob(path)]
 	patch_count = 0
 	for image in images:
-
-		
 		#stick to one row first
 		for vertical_step in range((image.shape[0]-filter_size[0])//stride+1):
 			
@@ -32,10 +30,10 @@ def crop_images(path,filter_size,stride):
 				vertical_start_point:vertical_end_point]
 				
 				#write image to a directory
-				tifffile.imsave('patches/clean/%d.tif'%
+				tifffile.imsave('patches-for-prediction/dirty-patches-test/%d.tif'%
 					(patch_count),
 					crop_image)
 
 				patch_count += 1
 
-crop_images('100-MNIST-images/*.jpg',(5,5),1)
+crop_images('testing-images/*.tif',(5,5),1)

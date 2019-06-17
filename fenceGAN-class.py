@@ -1,16 +1,15 @@
-import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from keras.layers import Dense, Reshape, Input, BatchNormalization,Flatten
 from keras.models import Sequential,Model,load_model
 from keras.optimizers import SGD, Adam, rmsprop
 from keras.layers.advanced_activations import LeakyReLU
-from keras.losses import binary_crossentropy
-from keras.preprocessing.image import load_img, img_to_array, array_to_img
-import tensorflow as tf
-from keras import backend as K
+from keras.preprocessing.image import img_to_array, array_to_img
 from custom_losses import *
 import tifffile
+import seaborn
+
 '''fenceGAN implementation
 author@chengyang
 '''
@@ -29,7 +28,9 @@ class fenceGAN():
 		self.g_loss_array = np.empty((0,1))
 		self.num_of_patches = 57600
 		self.num_of_noise = 2000
+		self.num_of_adv = 5760
 		self.clean_dataset = self.get_dataset(self.num_of_patches,'patches/clean/%d.tif')
+		self.adv_dataset = self.get_dataset(self.num_of_adv,'patches-for-prediction/dirty-patches-test/%d.tif')
 		self.noise = np.random.normal(0.5,0.5,(self.num_of_noise,self.latent_dim))
 
 	def get_dataset(self, num_of_patches,path):
@@ -85,14 +86,13 @@ class fenceGAN():
 		#combined model
 		z = Input(shape = (self.latent_dim,))
 		fake_result = self.G(z)
-		for layer in self.D.layers:
-			layer.trainable = False
-		# self.D.trainable = False
+		self.D.trainable = False
 		validity = self.D(fake_result)
 		combined_model = Model(z,validity)
 		#here  the beta value is set to 15
 		combined_model.compile(loss = combined_loss(fake_result,20,2),
 			optimizer = 'rmsprop')
+		self.D.trainable = True
 		return combined_model
 	def pretrain(self):
 		for epoch in range(20):
@@ -146,21 +146,33 @@ class fenceGAN():
 				self.g_loss_array = np.append(self.g_loss_array,np.array([[g_loss]]),axis = 0)
 			print('epoch%d d_loss:%f'%(epoch,d_loss))
 			print('epoch%d g_loss:%f'%(epoch,g_loss))
-	def report_scores(self):
-		#get batch of clean patches
-		real_index = np.random.randint(0,self.num_of_patches,self.batch_size)
+			self.report_scores(epoch)
+	def report_scores(self,epoch):
+		#get 1000 clean patches
+		real_index = np.random.randint(0,self.num_of_patches,1000)
 		batch_real = self.clean_dataset[real_index]
-		
 		validity_d = self.D.predict(batch_real)
 		
 		
-		#get batch of noise
-		fake_index = np.random.randint(0,self.num_of_noise,self.batch_size)
+		#get 1000 noise
+		fake_index = np.random.randint(0,self.num_of_noise,1000)
 		batch_noise = self.noise[fake_index]
-
 		validity_g = self.GAN.predict(batch_noise)
 		
-
+		#get 1000 adv patches
+		adv_index = np.random.randint(0,self.num_of_adv,1000)
+		batch_adv = self.adv_dataset[adv_index]
+		validity_a = self.D.predict(batch_adv)
+		
+		sns.distplot(validity_d,hist = False,rug = True,label = 'real')
+		sns.distplot(validity_g,hist = False,rug = True,label = 'generated')
+		sns.distplot(validity_a,hist = False,rug = True,label = 'adversarial')
+		plt.legend(prop={'size': 16})
+		plt.title('Density Plot of different patches')
+		plt.xlabel('discriminator score')
+		plt.ylabel('Density')
+		plt.savefig('loss-graph/%d.png'%epoch)
+		plt.close()
 		
 	def plot_losses(self):
 		#plot the loss over epochs
@@ -183,19 +195,15 @@ class fenceGAN():
 		self.G.save('model-files/G.h5')
 		self.D.save('model-files/D.h5')
 
-	def predict_on_patches(self):
-		test_dataset = self.get_dataset(576,'patches-for-prediction/dirty-patches-test/%d.tif')
-		# predictor = load_model('model-files/D.h5')
-		predictor = self.D
-		predictions = predictor.predict(test_dataset)
+	'''def progress_report(self):
+		self'''
+
 		
 
 
 fenceGAN = fenceGAN()
 fenceGAN.pretrain()
-fenceGAN.train(10)
-fenceGAN.report_scores()
+fenceGAN.train(20)
 fenceGAN.plot_losses()
-fenceGAN.save_model()
-fenceGAN.save_generated_images()
-fenceGAN.predict_on_patches()
+# fenceGAN.save_model()
+# fenceGAN.save_generated_images()
