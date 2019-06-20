@@ -24,7 +24,7 @@ class fenceGAN():
 		self.batch_size = 32
 		self.gm = 0.1
 		self.gamma = K.variable([1])
-		self.g_optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
+		self.g_optimizer = Adam(lr = 5e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
 		self.d_optimizer = Adam(lr = 3e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
@@ -171,7 +171,7 @@ class fenceGAN():
 				real_label = np.ones(self.batch_size)
 				noise_label = np.zeros(self.batch_size)
 				half_label = np.zeros(2*self.batch_size)
-				half_label[:] = 0.6
+				half_label[:] = 0.5
 				
 				#train discriminator
 				fake_generated_1 = self.G.predict(batch_noise_d)
