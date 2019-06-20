@@ -16,18 +16,16 @@ author@chengyang
 '''
 class fenceGAN():
 	def __init__(self):
-		self.image_rows = 7
-		self.image_columns = 7
+		self.image_rows = 5
+		self.image_columns = 5
 		self.image_channels = 1
 		self.image_shape = (self.image_rows, self.image_columns, self.image_channels)
 		self.latent_dim = 10
-		self.batch_size = 256
+		self.batch_size = 32
 		self.gm = 0.1
 		self.gamma = K.variable([1])
-		# self.g_optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
-		# self.d_optimizer = Adam(lr = 3e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
-		self.g_optimizer = Adam(lr = 3e-5,beta_1 = 0.5, beta_2 = 0.999,decay = 1e-5)
-		self.d_optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999,decay = 1e-5)
+		self.g_optimizer = Adam(lr = 5e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
+		self.d_optimizer = Adam(lr = 3e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
 		self.GAN = self.combined_model()
@@ -36,9 +34,8 @@ class fenceGAN():
 		self.g_loss_array = np.empty((0,1))
 
 		self.num_of_patches = 42000
-		self.num_of_noise = 42000
+		self.num_of_noise = 2000
 		self.num_of_adv = 1000
-		self.num_of_iterations = self.num_of_patches//self.batch_size
 		self.clean_dataset = self.get_dataset(self.num_of_patches,'patches/clean/%d.tif')
 		self.clean_dataset = self.clean_dataset.astype('float32')
 		self.clean_dataset /= 255
@@ -51,7 +48,7 @@ class fenceGAN():
 		self.real_indexes = np.random.randint(0,self.num_of_patches,10)
 		self.adv_indexes = np.random.randint(0,self.num_of_adv,10)
 	def get_dataset(self, num_of_patches,path):
-		dataset = np.empty((0,7,7,1))
+		dataset = np.empty((0,5,5,1))
 		for patch_id in range(num_of_patches):
 			img = tifffile.imread(path
 				%patch_id)
@@ -64,11 +61,7 @@ class fenceGAN():
 	def build_generator(self):
 		model = Sequential()
 		
-		model.add(Dense(16,input_shape = (self.latent_dim,)))
-		model.add(LeakyReLU(alpha = 0.4))
-		model.add(BatchNormalization(momentum = 0.8))
-
-		model.add(Dense(32))
+		model.add(Dense(32,input_shape = (self.latent_dim,)))
 		model.add(LeakyReLU(alpha = 0.4))
 		model.add(BatchNormalization(momentum = 0.8))
 
@@ -80,6 +73,13 @@ class fenceGAN():
 		model.add(LeakyReLU(alpha = 0.4))
 		model.add(BatchNormalization(momentum = 0.8))
 
+		model.add(Dense(256))
+		model.add(LeakyReLU(alpha = 0.4))
+		model.add(BatchNormalization(momentum = 0.8))
+
+		model.add(Dense(512))
+		model.add(LeakyReLU(alpha = 0.4))
+		model.add(BatchNormalization(momentum = 0.8))
 
 		model.add(Dense(np.prod(self.image_shape)))
 		model.add(LeakyReLU(alpha = 0.4))
@@ -98,6 +98,8 @@ class fenceGAN():
 		model = Sequential()
 		
 		model.add(Flatten(input_shape = self.image_shape))
+		model.add(Dense(32))
+		model.add(LeakyReLU(alpha = 0.4))
 
 		model.add(Dense(64))
 		model.add(LeakyReLU(alpha = 0.4))
@@ -106,6 +108,9 @@ class fenceGAN():
 		model.add(LeakyReLU(alpha = 0.4))
 
 		model.add(Dense(256))
+		model.add(LeakyReLU(alpha = 0.4))
+
+		model.add(Dense(512))
 		model.add(LeakyReLU(alpha = 0.4))
 
 		model.add(Dense(1,activation = 'sigmoid'))
@@ -121,7 +126,7 @@ class fenceGAN():
 		fake_result = self.G(z)
 		validity = self.D(fake_result)
 		combined_model = Model(z,validity)
-		combined_model.compile(loss = combined_loss(fake_result,15,2),
+		combined_model.compile(loss = combined_loss(fake_result,10,2),
 			optimizer = self.g_optimizer)
 		
 		return combined_model
@@ -151,9 +156,7 @@ class fenceGAN():
 
 	def train(self, epochs):
 		for epoch in range(epochs):
-			epoch_d_loss = 0
-			epoch_g_loss = 0
-			for iteration in range(self.num_of_iterations):
+			for iteration in range(self.num_of_noise//self.batch_size):
 				#get batch of clean patches
 				real_index = np.random.randint(0,self.num_of_patches,self.batch_size)
 				batch_real = self.clean_dataset[real_index]
@@ -168,32 +171,29 @@ class fenceGAN():
 				real_label = np.ones(self.batch_size)
 				noise_label = np.zeros(self.batch_size)
 				half_label = np.zeros(2*self.batch_size)
-				half_label[:] = 0.6
+				half_label[:] = 0.5
 				
 				#train discriminator
 				fake_generated_1 = self.G.predict(batch_noise_d)
 				self.D.trainable = True
 				K.set_value(self.gamma,[self.gm])
-				epoch_d_loss += self.D.train_on_batch(fake_generated_1,noise_label)
+				d_loss_1 = self.D.train_on_batch(fake_generated_1,noise_label)
 				K.set_value(self.gamma,[1])
-				epoch_d_loss += self.D.train_on_batch(batch_real,real_label)
+				d_loss_2 = self.D.train_on_batch(batch_real,real_label)
 				
 				#record discriminator loss
-				# d_loss = 5*d_loss_1 + 5*d_loss_2
-				
+				d_loss = 5*d_loss_1 + 5*d_loss_2
+				self.d_loss_array = np.append(self.d_loss_array,np.array([[d_loss]]),axis=0)
 				
 				#train generator
 				self.D.trainable = False
-				epoch_g_loss += self.GAN.train_on_batch(batch_noise_g,half_label)
+				g_loss = self.GAN.train_on_batch(batch_noise_g,half_label)
 				
 				#record generator loss
-			epoch_g_loss /= 500
-			epoch_d_loss /= 50
-			self.g_loss_array = np.append(self.g_loss_array,np.array([[epoch_g_loss]]),axis = 0)
-			self.d_loss_array = np.append(self.d_loss_array,np.array([[epoch_d_loss]]),axis=0)
+				self.g_loss_array = np.append(self.g_loss_array,np.array([[g_loss]]),axis = 0)
 			self.plot_losses()
-			print('epoch%d d_loss:%f'%(epoch,epoch_d_loss))
-			print('epoch%d g_loss:%f'%(epoch,epoch_g_loss))
+			print('epoch%d d_loss:%f'%(epoch,d_loss))
+			print('epoch%d g_loss:%f'%(epoch,g_loss))
 			self.report_scores(epoch)
 			self.progress_report(epoch)
 	def report_scores(self,epoch):
@@ -272,7 +272,7 @@ class fenceGAN():
 		plt.close()
 
 fenceGAN = fenceGAN()
-# fenceGAN.pretrain()
+fenceGAN.pretrain()
 fenceGAN.train(100)
 fenceGAN.save_model()
 fenceGAN.save_generated_images()
