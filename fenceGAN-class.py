@@ -108,8 +108,8 @@ class fenceGAN():
 		model.add(Dense(256))
 		model.add(LeakyReLU(alpha = 0.4))
 
-		# model.add(Dense(512))
-		# model.add(LeakyReLU(alpha = 0.4))
+		model.add(Dense(512))
+		model.add(LeakyReLU(alpha = 0.4))
 
 		model.add(Dense(1,activation = 'sigmoid'))
 		model.compile(loss = self.weighted_d_loss, 
