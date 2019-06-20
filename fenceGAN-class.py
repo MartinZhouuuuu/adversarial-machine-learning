@@ -24,8 +24,8 @@ class fenceGAN():
 		self.batch_size = 32
 		self.gm = 0.1
 		self.gamma = K.variable([1])
-		self.optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
-
+		self.g_optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
+		self.d_optimizer = Adam(lr = 3e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
 		self.GAN = self.combined_model()
@@ -38,9 +38,11 @@ class fenceGAN():
 		self.num_of_adv = 1000
 		self.clean_dataset = self.get_dataset(self.num_of_patches,'patches/clean/%d.tif')
 		self.clean_dataset = self.clean_dataset.astype('float32')
-		# self.clean_dataset /= 255
+		self.clean_dataset /= 255
+		
 		self.adv_dataset = self.get_dataset(self.num_of_adv,'patches/dirty/%d.tif')
 		self.adv_dataset = self.adv_dataset.astype('float32')
+		
 		self.noise = np.random.normal(0.5,0.5,(self.num_of_noise,self.latent_dim))
 		
 		self.real_indexes = np.random.randint(0,self.num_of_patches,10)
@@ -113,7 +115,7 @@ class fenceGAN():
 
 		model.add(Dense(1,activation = 'sigmoid'))
 		model.compile(loss = self.weighted_d_loss, 
-			optimizer = self.optimizer)
+			optimizer = self.d_optimizer)
 		
 		return model
 
@@ -125,7 +127,7 @@ class fenceGAN():
 		validity = self.D(fake_result)
 		combined_model = Model(z,validity)
 		combined_model.compile(loss = combined_loss(fake_result,10,2),
-			optimizer = self.optimizer)
+			optimizer = self.g_optimizer)
 		
 		return combined_model
 
@@ -271,6 +273,6 @@ class fenceGAN():
 
 fenceGAN = fenceGAN()
 fenceGAN.pretrain()
-fenceGAN.train(50)
+fenceGAN.train(100)
 fenceGAN.save_model()
 fenceGAN.save_generated_images()
