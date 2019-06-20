@@ -24,7 +24,7 @@ class fenceGAN():
 		self.batch_size = 32
 		self.gm = 0.1
 		self.gamma = K.variable([1])
-		self.optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
+		self.optimizer = Adam(lr = 3e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
 
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
@@ -33,18 +33,24 @@ class fenceGAN():
 		self.d_loss_array = np.empty((0,1))
 		self.g_loss_array = np.empty((0,1))
 
-		self.num_of_patches = 57600
+		self.num_of_patches = 42000
 		self.num_of_noise = 2000
-		self.num_of_adv = 5760
+		self.num_of_adv = 1000
 		self.clean_dataset = self.get_dataset(self.num_of_patches,'patches/clean/%d.tif')
-		self.adv_dataset = self.get_dataset(self.num_of_adv,'patches-for-prediction/dirty-patches-test/%d.tif')
+		self.clean_dataset = self.clean_dataset.astype('float32')
+		self.clean_dataset /= 255
+		self.adv_dataset = self.get_dataset(self.num_of_adv,'patches/dirty/%d.tif')
+		self.adv_dataset = self.adv_dataset.astype('float32')
 		self.noise = np.random.normal(0.5,0.5,(self.num_of_noise,self.latent_dim))
 		
+		self.real_indexes = np.random.randint(0,self.num_of_patches,10)
+		self.adv_indexes = np.random.randint(0,self.num_of_adv,10)
 	def get_dataset(self, num_of_patches,path):
 		dataset = np.empty((0,5,5,1))
 		for patch_id in range(num_of_patches):
 			img = tifffile.imread(path
 				%patch_id)
+			img = img
 			img_array = img_to_array(img)
 			dataset = np.append(dataset,[img_array],axis = 0)
 		
@@ -102,8 +108,8 @@ class fenceGAN():
 		model.add(Dense(256))
 		model.add(LeakyReLU(alpha = 0.4))
 
-		model.add(Dense(512))
-		model.add(LeakyReLU(alpha = 0.4))
+		# model.add(Dense(512))
+		# model.add(LeakyReLU(alpha = 0.4))
 
 		model.add(Dense(1,activation = 'sigmoid'))
 		model.compile(loss = self.weighted_d_loss, 
@@ -118,7 +124,7 @@ class fenceGAN():
 		fake_result = self.G(z)
 		validity = self.D(fake_result)
 		combined_model = Model(z,validity)
-		combined_model.compile(loss = combined_loss(fake_result,15,2),
+		combined_model.compile(loss = combined_loss(fake_result,10,2),
 			optimizer = self.optimizer)
 		
 		return combined_model
@@ -163,7 +169,7 @@ class fenceGAN():
 				real_label = np.ones(self.batch_size)
 				noise_label = np.zeros(self.batch_size)
 				half_label = np.zeros(2*self.batch_size)
-				half_label[:] = 0.5
+				half_label[:] = 0.6
 				
 				#train discriminator
 				fake_generated_1 = self.G.predict(batch_noise_d)
@@ -183,6 +189,7 @@ class fenceGAN():
 				
 				#record generator loss
 				self.g_loss_array = np.append(self.g_loss_array,np.array([[g_loss]]),axis = 0)
+			self.plot_losses()
 			print('epoch%d d_loss:%f'%(epoch,d_loss))
 			print('epoch%d g_loss:%f'%(epoch,g_loss))
 			self.report_scores(epoch)
@@ -199,14 +206,12 @@ class fenceGAN():
 		validity_g = self.GAN.predict(batch_noise)
 		
 		#get 1000 adv patches
-		adv_index = np.random.randint(0,self.num_of_adv,1000)
-		batch_adv = self.adv_dataset[adv_index]
-		validity_a = self.D.predict(batch_adv)
+		validity_a = self.D.predict(self.adv_dataset)
 		
-		sns.distplot(validity_d,hist = False,rug = True,label = 'real')
-		sns.distplot(validity_g,hist = False,rug = True,label = 'generated')
-		sns.distplot(validity_a,hist = False,rug = True,label = 'adversarial')
-		plt.legend(prop={'size': 8})
+		sns.distplot(validity_d,hist = True,rug = False,label = 'real')
+		sns.distplot(validity_g,hist = True,rug = False,label = 'generated')
+		sns.distplot(validity_a,hist = True,rug = False,label = 'adversarial')
+		plt.legend(prop={'size': 14})
 		plt.title('Density Plot of different patches')
 		plt.xlabel('discriminator score')
 		plt.ylabel('Density')
@@ -235,36 +240,37 @@ class fenceGAN():
 	def progress_report(self,epoch):
 		row, column = 3,10
 		
-		batch_real = self.clean_dataset[2001:2011]
+		batch_real = self.clean_dataset[self.real_indexes]
 		validity_d = self.D.predict(batch_real)
 		
 		batch_noise = self.noise[:10]
 		batch_generated = self.G.predict(batch_noise)
 		validity_g = self.GAN.predict(batch_noise)
 
-		batch_adv = self.adv_dataset[2001:2011]
+		batch_adv = self.adv_dataset[self.adv_indexes]
 		validity_a = self.D.predict(batch_adv)
 		
 		fig, axs = plt.subplots(row,column)
-
 		for j in range(column):
 			axs[0,j].imshow(batch_real[j,:,:,0],cmap = 'gray')
 			axs[0,j].axis('off')
-			axs[0,j].set_title('%0.3f'%validity_d[j,:],size = 8)
+			axs[0,j].set_title('%0.3f'%validity_d[j,:],size = 12)
 			
 			axs[1,j].imshow(batch_generated[j,:,:,0],cmap = 'gray')
 			axs[1,j].axis('off')
-			axs[1,j].set_title('%0.3f'%validity_g[j,:],size = 8)
+			axs[1,j].set_title('%0.3f'%validity_g[j,:],size = 12)
 			
 			axs[2,j].imshow(batch_adv[j,:,:,0],cmap = 'gray')
 			axs[2,j].axis('off')
-			axs[2,j].set_title('%0.3f'%validity_a[j,:],size = 8)
+			axs[2,j].set_title('%0.3f'%validity_a[j,:],size = 12)
+		fig.text(0.45, 0.65, 'real',fontsize = 15)
+		fig.text(0.45, 0.4, 'generated',fontsize = 15)
+		fig.text(0.45, 0.1, 'adversarial',fontsize = 15)
 		fig.savefig('sample-images/%d.png'%epoch)
 		plt.close()
 
 fenceGAN = fenceGAN()
 fenceGAN.pretrain()
-fenceGAN.train(100)
-fenceGAN.plot_losses()
+fenceGAN.train(50)
 fenceGAN.save_model()
 fenceGAN.save_generated_images()

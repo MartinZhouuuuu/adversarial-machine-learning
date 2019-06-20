@@ -1,6 +1,7 @@
 import tifffile
 import glob
 import cv2
+import random
 '''
 Crops small patches from an image
 Arguments:
@@ -13,27 +14,21 @@ def crop_images(path,filter_size,stride):
 	images = [tifffile.imread(file) for file in glob.glob(path)]
 	patch_count = 0
 	for image in images:
-		#stick to one row first
-		for vertical_step in range((image.shape[0]-filter_size[0])//stride+1):
-			
-			#filter move down the row with a given stride
-			for horizontal_step in range((image.shape[1]-filter_size[1])//stride+1):
-				
-				#picking the start and end points
-				horizontal_start_point = 0 + stride*vertical_step
-				horizontal_end_point = filter_size[0] + stride*vertical_step
-				vertical_start_point = 0+stride*horizontal_step
-				vertical_end_point = filter_size[1]+stride*horizontal_step
-				
-				#array slicing
-				crop_image = image[horizontal_start_point:horizontal_end_point,
-				vertical_start_point:vertical_end_point]
-				
-				#write image to a directory
-				tifffile.imsave('patches-for-prediction/dirty-patches-test/%d.tif'%
-					(patch_count),
-					crop_image)
+		random_row = random.randint(0,22)
+		random_column = random.randint(0,22)
+		horizontal_start_point = random_column
+		horizontal_end_point = horizontal_start_point + filter_size[1]
+		vertical_start_point = random_row
+		vertical_end_point = filter_size[0] + vertical_start_point
+		#array slicing
+		crop_image = image[horizontal_start_point:horizontal_end_point,
+		vertical_start_point:vertical_end_point]
+		
+		#write image to a directory
+		tifffile.imsave('patches/dirty/%d.tif'%
+			(patch_count),
+			crop_image)
 
-				patch_count += 1
+		patch_count += 1
 
-crop_images('testing-images/*.tif',(5,5),1)
+crop_images('adv-images-for-cropping/*.tif',(5,5),1)
