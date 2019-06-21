@@ -14,8 +14,8 @@ def crop_images(path,filter_size,stride):
 	images = [tifffile.imread(file) for file in glob.glob(path)]
 	patch_count = 0
 	for image in images:
-		random_row = random.randint(0,20)
-		random_column = random.randint(0,20)
+		random_row = random.randint(0,22)
+		random_column = random.randint(0,22)
 		horizontal_start_point = random_column
 		horizontal_end_point = horizontal_start_point + filter_size[1]
 		vertical_start_point = random_row
@@ -31,4 +31,4 @@ def crop_images(path,filter_size,stride):
 
 		patch_count += 1
 
-crop_images('adv-images-for-cropping/*.tif',(7,7),1)
+crop_images('adv-images-for-cropping/*.tif',(5,5),1)
