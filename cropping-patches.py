@@ -14,21 +14,22 @@ def crop_images(path,filter_size,stride):
 	images = [tifffile.imread(file) for file in glob.glob(path)]
 	patch_count = 0
 	for image in images:
-		random_row = random.randint(0,20)
-		random_column = random.randint(0,20)
-		horizontal_start_point = random_column
-		horizontal_end_point = horizontal_start_point + filter_size[1]
-		vertical_start_point = random_row
-		vertical_end_point = filter_size[0] + vertical_start_point
-		#array slicing
-		crop_image = image[horizontal_start_point:horizontal_end_point,
-		vertical_start_point:vertical_end_point]
-		
-		#write image to a directory
-		tifffile.imsave('patches/dirty/%d.tif'%
-			(patch_count),
-			crop_image)
+		for patch in range(50):	
+			random_row = random.randint(0,20)
+			random_column = random.randint(0,20)
+			horizontal_start_point = random_column
+			horizontal_end_point = horizontal_start_point + filter_size[1]
+			vertical_start_point = random_row
+			vertical_end_point = filter_size[0] + vertical_start_point
+			#array slicing
+			crop_image = image[horizontal_start_point:horizontal_end_point,
+			vertical_start_point:vertical_end_point]
+			
+			#write image to a directory
+			tifffile.imsave('patches/dirty/%d.tif'%
+				(patch_count),
+				crop_image)
 
-		patch_count += 1
+			patch_count += 1
 
 crop_images('adv-images-for-cropping/*.tif',(7,7),1)
