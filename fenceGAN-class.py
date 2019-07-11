@@ -55,7 +55,6 @@ class fenceGAN():
 		for patch_id in range(num_of_patches):
 			img = tifffile.imread(path
 				%patch_id)
-			img = img
 			img_array = img_to_array(img)
 			dataset = np.append(dataset,[img_array],axis = 0)
 		
