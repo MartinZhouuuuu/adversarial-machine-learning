@@ -6,10 +6,9 @@ import matplotlib.pyplot as plt
 from keras.layers import *
 from keras.models import Sequential,Model,load_model
 from keras.optimizers import SGD, Adam, rmsprop
-from keras.preprocessing.image import img_to_array, array_to_img
+from keras.preprocessing.image import img_to_array
 from keras.utils import to_categorical
 import tifffile
-import keras.backend as K
 import os
 import random
 class Clean_dirty_classifier():
@@ -17,10 +16,13 @@ class Clean_dirty_classifier():
 		self.num_of_columns = 28
 		self.num_of_rows = 28
 		self.image_shape = (self.num_of_rows,self.num_of_columns,1)
-		self.optimizer = Adam(lr = 0.0003)
+		self.optimizer = Adam()
+		self.num_of_iterations = 100
 		self.classifier = self.classifier()
 		self.train_loss_array = np.empty((0,1))
 		self.train_acc_array = np.empty((0,1))
+		self.val_loss_array = np.empty((0,1))
+		self.val_acc_array = np.empty((0,1))
 
 	def get_dataset(self,path,sample_size):
 		dataset = np.empty((0,28,28,1))
@@ -87,10 +89,11 @@ class Clean_dirty_classifier():
 		return model
 
 	def train(self,epochs):
+		best_val_acc = 0
 		for epoch in range(epochs):
 			epoch_loss = 0
 			epoch_acc = 0
-			for iteration in range(100):
+			for iteration in range(self.num_of_iterations):
 				train_x, train_y = self.get_dataset(
 					'/Users/apple/Google Drive/adversarial-machine-learning/full-fgsm/train',
 					32
@@ -100,13 +103,32 @@ class Clean_dirty_classifier():
 				epoch_acc += train_return[1]
 
 
-		epoch_loss /= 100
-		epoch_acc /= 100
-		print('Epoch%d train_loss:%0.3f train_acc:%0.3f'%(epoch, epoch_loss,epoch_acc))
-		self.train_loss_array = np.append(self.train_loss_array,np.array([[epoch_loss]]),axis=0)
-		self.train_acc_array = np.append(self.train_acc_array,np.array([[epoch_acc]]),axis=0)
-		self.save_model()
+			epoch_loss /= self.num_of_iterations
+			epoch_acc /= self.num_of_iterations
+		
+			print('Epoch%d train_loss:%0.3f train_acc:%0.3f'%(epoch+1, epoch_loss,epoch_acc))
+			self.train_loss_array = np.append(self.train_loss_array,np.array([[epoch_loss]]),axis=0)
+			self.train_acc_array = np.append(self.train_acc_array,np.array([[epoch_acc]]),axis=0)
+		
+			#validation
+			val_x, val_y = self.get_dataset(
+				'/Users/apple/Google Drive/adversarial-machine-learning/full-fgsm/test',
+				500
+				)
 
+			val_loss,val_acc = self.classifier.evaluate(val_x,val_y)
+			self.val_loss_array = np.append(self.val_loss_array,np.array([[val_loss]]),axis=0)
+			self.val_acc_array = np.append(self.val_acc_array,np.array([[val_acc]]),axis=0)
+			print('val_loss:%0.3f val_acc:%0.3f'%(val_loss,val_acc))
+			#model checkpointer
+			if val_acc >= best_val_acc:
+				print('val acc increased from %0.3f to %0.3f'%(best_val_acc,val_acc))
+				best_val_acc = val_acc
+				self.save_model()
+				print('model saved')
+			else:
+				print('val acc did not increase')
+			self.plot_losses()
 
 	def save_model(self):
 		self.classifier.save('model-files/classifier.h5')
@@ -121,8 +143,28 @@ class Clean_dirty_classifier():
 		test_loss,test_acc = best_model.evaluate(test_x,test_y)
 		print('test_loss:%0.3f test_acc:%0.3f'%(test_loss,test_acc))
 
+
+	def plot_losses(self):
+		plt.plot(self.train_acc_array[:,0])
+		plt.plot(self.val_acc_array[:,0])
+		plt.title("Accuracy")
+		plt.ylabel('Accuracy')
+		plt.xlabel('Epoch')
+		plt.legend(['Train', 'Validation'], loc = 'upper left')
+		plt.savefig("/Users/apple/Google Drive/adversarial-machine-learning/plots/accuracy.png")
+		plt.close()
+
+		plt.plot(self.train_loss_array[:,0])
+		plt.plot(self.val_loss_array[:,0])
+		plt.title("Loss")
+		plt.ylabel('Loss')
+		plt.xlabel('Epoch')
+		plt.legend(['Train', 'Validation'], loc = 'upper right')
+		plt.savefig("/Users/apple/Google Drive/adversarial-machine-learning/plots/loss.png")
+		plt.close()
+		print('plots saved')
 classifier = Clean_dirty_classifier()
-classifier.train(3)
+classifier.train(5)
 classifier.test()
 
 
