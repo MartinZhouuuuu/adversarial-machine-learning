@@ -3,21 +3,22 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from keras.layers import Dense, Reshape, Input, BatchNormalization,Flatten
 from keras.models import Sequential,Model,load_model
-from keras.optimizers import SGD, Adam, rmsprop
+from keras.optimizers import Adam, rmsprop
 from keras.layers.advanced_activations import LeakyReLU
 from keras.losses import binary_crossentropy
-from keras.preprocessing.image import img_to_array, array_to_img
+from keras.preprocessing.image import img_to_array
 from custom_losses import *
 import tifffile
-import seaborn
 import keras.backend as K
+import random
+import os
 '''fenceGAN implementation
 author@chengyang
 '''
 class fenceGAN():
 	def __init__(self):
-		self.image_rows = 7
-		self.image_columns = 7
+		self.image_rows = 28
+		self.image_columns = 28
 		self.image_channels = 1
 		self.image_shape = (self.image_rows, self.image_columns, self.image_channels)
 		self.latent_dim = 10
@@ -35,28 +36,26 @@ class fenceGAN():
 		self.d_loss_array = np.empty((0,1))
 		self.g_loss_array = np.empty((0,1))
 
-		self.num_of_patches = 42000
-		self.num_of_noise = 42000
+		self.num_of_patches = 30000
+		self.num_of_noise = 30000
 		self.num_of_adv = 1000
 		self.num_of_iterations = self.num_of_patches//self.batch_size
-		self.clean_dataset = self.get_dataset(self.num_of_patches,'patches/clean/%d.tif')
+		self.clean_dataset = self.get_dataset(self.num_of_patches,'full-fgsm/train/original')
 		self.clean_dataset = self.clean_dataset.astype('float32')
-		self.clean_dataset /= 255
 		
-		self.adv_dataset = self.get_dataset(self.num_of_adv,'patches/dirty/%d.tif')
+		self.adv_dataset = self.get_dataset(self.num_of_adv,'full-fgsm/train/adversarial')
 		self.adv_dataset = self.adv_dataset.astype('float32')
 		
 		self.noise = np.random.normal(0.5,0.5,(self.num_of_noise,self.latent_dim))
 		
 		self.real_indexes = np.random.randint(0,self.num_of_patches,10)
 		self.adv_indexes = np.random.randint(0,self.num_of_adv,10)
-	def get_dataset(self, num_of_patches,path):
-		dataset = np.empty((0,7,7,1))
-		for patch_id in range(num_of_patches):
-			img = tifffile.imread(path
-				%patch_id)
-			img_array = img_to_array(img)
-			dataset = np.append(dataset,[img_array],axis = 0)
+	def get_dataset(self,num_of_patches,path):
+		dataset = np.empty((0,28,28,1))
+		filenames = os.listdir(path)
+		for name in filenames:
+			image = tifffile.imread(os.path.join(path,name))
+			dataset = np.append(dataset,[image],axis = 0)
 		
 		return dataset
 
