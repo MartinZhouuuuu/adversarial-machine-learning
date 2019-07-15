@@ -7,8 +7,8 @@ import os
 import random
 
 image = tifffile.imread(
-	'/Users/apple/Google Drive/adversarial-machine-learning/full-fgsm/test/adversarial/4884.tif'
+	'/Users/apple/Google Drive/adversarial-machine-learning/patches/test/original/49.tif'
 	)
-model = load_model('model-files/classifier.h5')
-prediction = model.predict(image.reshape(1,28,28,1))
+model = load_model('model-files/classifier-5.h5')
+prediction = model.predict(image.reshape(1,5,5,1))
 print(prediction)

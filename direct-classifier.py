@@ -13,8 +13,8 @@ import os
 import random
 class Clean_dirty_classifier():
 	def __init__(self,rows,columns):
-		self.num_of_columns = columns
 		self.num_of_rows = rows
+		self.num_of_columns = columns
 		self.image_shape = (self.num_of_rows,self.num_of_columns,1)
 		self.optimizer = Adam()
 		self.num_of_iterations = 100
@@ -87,7 +87,7 @@ class Clean_dirty_classifier():
 			for iteration in range(self.num_of_iterations):
 				train_x, train_y = self.get_dataset(
 					'patches/train',
-					32
+					128
 					)
 				train_return = self.classifier.train_on_batch(train_x,train_y)
 				epoch_loss += train_return[0]
@@ -122,15 +122,13 @@ class Clean_dirty_classifier():
 			self.plot_losses()
 
 	def save_model(self):
-		self.classifier.save('model-files/classifier-5by5.h5')
+		self.classifier.save('model-files/classifier-5.h5')
 
 
 	def test(self):
 		test_x, test_y = self.get_dataset(
-					'patches/test',
-					500
-					)
-		best_model = load_model('model-files/classifier-5by5.h5')
+					'patches/test',5000)
+		best_model = load_model('model-files/classifier-5.h5')
 		test_loss,test_acc = best_model.evaluate(test_x,test_y)
 		print('test_loss:%0.3f test_acc:%0.3f'%(test_loss,test_acc))
 
@@ -154,10 +152,35 @@ class Clean_dirty_classifier():
 		plt.savefig("plots/loss.png")
 		plt.close()
 		print('plots saved')
-classifier = Clean_dirty_classifier(5,5)
-# classifier.train(8)
-classifier.test()
 
+	def sample_scores(self):
+		row, column = 2,10
+		test_x, test_y = self.get_dataset(
+					'patches/test',column)
+		best_model = load_model('model-files/classifier-5.h5')
+		
+		batch_adv = test_x[:column]
+		validity_adv = best_model.predict(batch_adv)
+		batch_real = test_x[column:]
+		validity_real = best_model.predict(batch_real)
+		fig, axs = plt.subplots(row,column)
+		for j in range(column):
+			axs[0,j].imshow(batch_real[j,:,:,0],cmap = 'gray')
+			axs[0,j].axis('off')
+			axs[0,j].set_title('%0.3f'%validity_real[j,1],size = 12)
+			
+			axs[1,j].imshow(batch_adv[j,:,:,0],cmap = 'gray')
+			axs[1,j].axis('off')
+			axs[1,j].set_title('%0.3f'%validity_adv[j,1],size = 12)
+
+		fig.text(0.5, 0.6, 'real',fontsize = 15)
+		fig.text(0.45, 0.1, 'adversarial',fontsize = 15)
+		fig.savefig('sample.png')
+		plt.close()
+classifier = Clean_dirty_classifier(5,5)
+# classifier.train(20)
+# classifier.test()
+classifier.sample_scores()
 
 
 
