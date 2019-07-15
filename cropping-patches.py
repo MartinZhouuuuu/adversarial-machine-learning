@@ -14,8 +14,8 @@ def crop_images(path,filter_size,stride):
 	images = [tifffile.imread(file) for file in glob.glob(path)]
 	patch_count = 0
 	for image in images:
-		random_row = random.randint(0,20)
-		random_column = random.randint(0,20)
+		random_row = random.randint(0,22)
+		random_column = random.randint(0,22)
 		horizontal_start_point = random_column
 		horizontal_end_point = horizontal_start_point + filter_size[1]
 		vertical_start_point = random_row
@@ -25,10 +25,10 @@ def crop_images(path,filter_size,stride):
 		vertical_start_point:vertical_end_point]
 		
 		#write image to a directory
-		tifffile.imsave('patches/dirty/%d.tif'%
+		tifffile.imsave('patches/test/adversarial/%d.tif'%
 			(patch_count),
 			crop_image)
 
 		patch_count += 1
 
-crop_images('adv-images-for-cropping/*.tif',(7,7),1)
+crop_images('full-fgsm/test/adversarial/*.tif',(5,5),1)

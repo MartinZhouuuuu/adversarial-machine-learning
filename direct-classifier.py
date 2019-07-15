@@ -12,9 +12,9 @@ import tifffile
 import os
 import random
 class Clean_dirty_classifier():
-	def __init__(self):
-		self.num_of_columns = 28
-		self.num_of_rows = 28
+	def __init__(self,rows,columns):
+		self.num_of_columns = columns
+		self.num_of_rows = rows
 		self.image_shape = (self.num_of_rows,self.num_of_columns,1)
 		self.optimizer = Adam()
 		self.num_of_iterations = 100
@@ -25,7 +25,7 @@ class Clean_dirty_classifier():
 		self.val_acc_array = np.empty((0,1))
 
 	def get_dataset(self,path,sample_size):
-		dataset = np.empty((0,28,28,1))
+		dataset = np.empty((0,self.num_of_rows,self.num_of_columns,1))
 		labels = np.empty((0,2))
 		for folder in os.listdir(path):	
 			if folder == 'original':
@@ -61,16 +61,7 @@ class Clean_dirty_classifier():
 		model.add(MaxPooling2D(pool_size=(2, 2)))
 		model.add(Dropout(0.2))
 
-		model.add(Conv2D(128, (3, 3), padding = 'same'))
-		model.add(Activation('relu'))
-		model.add(MaxPooling2D(pool_size=(2, 2)))
-		model.add(Dropout(0.2))
-
-		model.add(Conv2D(256, (3, 3), padding='same'))
-		model.add(Activation('relu'))
-		model.add(MaxPooling2D(pool_size=(2, 2)))
-		model.add(Dropout(0.2))
-
+		
 		model.add(Flatten())
 		model.add(Dense(32))
 		model.add(Activation('relu'))
@@ -95,7 +86,7 @@ class Clean_dirty_classifier():
 			epoch_acc = 0
 			for iteration in range(self.num_of_iterations):
 				train_x, train_y = self.get_dataset(
-					'/Users/apple/Google Drive/adversarial-machine-learning/full-fgsm/train',
+					'patches/train',
 					32
 					)
 				train_return = self.classifier.train_on_batch(train_x,train_y)
@@ -112,7 +103,7 @@ class Clean_dirty_classifier():
 		
 			#validation
 			val_x, val_y = self.get_dataset(
-				'/Users/apple/Google Drive/adversarial-machine-learning/full-fgsm/test',
+				'patches/test',
 				500
 				)
 
@@ -131,15 +122,15 @@ class Clean_dirty_classifier():
 			self.plot_losses()
 
 	def save_model(self):
-		self.classifier.save('model-files/classifier.h5')
+		self.classifier.save('model-files/classifier-5by5.h5')
 
 
 	def test(self):
 		test_x, test_y = self.get_dataset(
-					'/Users/apple/Google Drive/adversarial-machine-learning/full-fgsm/test',
+					'patches/test',
 					500
 					)
-		best_model = load_model('model-files/classifier.h5')
+		best_model = load_model('model-files/classifier-5by5.h5')
 		test_loss,test_acc = best_model.evaluate(test_x,test_y)
 		print('test_loss:%0.3f test_acc:%0.3f'%(test_loss,test_acc))
 
@@ -151,7 +142,7 @@ class Clean_dirty_classifier():
 		plt.ylabel('Accuracy')
 		plt.xlabel('Epoch')
 		plt.legend(['Train', 'Validation'], loc = 'upper left')
-		plt.savefig("/Users/apple/Google Drive/adversarial-machine-learning/plots/accuracy.png")
+		plt.savefig("plots/accuracy.png")
 		plt.close()
 
 		plt.plot(self.train_loss_array[:,0])
@@ -160,11 +151,11 @@ class Clean_dirty_classifier():
 		plt.ylabel('Loss')
 		plt.xlabel('Epoch')
 		plt.legend(['Train', 'Validation'], loc = 'upper right')
-		plt.savefig("/Users/apple/Google Drive/adversarial-machine-learning/plots/loss.png")
+		plt.savefig("plots/loss.png")
 		plt.close()
 		print('plots saved')
-classifier = Clean_dirty_classifier()
-classifier.train(5)
+classifier = Clean_dirty_classifier(5,5)
+# classifier.train(8)
 classifier.test()
 
 
