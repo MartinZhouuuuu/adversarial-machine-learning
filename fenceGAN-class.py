@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from keras.layers import Dense, Reshape, Input, BatchNormalization,Flatten
+from keras.layers import *
 from keras.models import Sequential,Model,load_model
-from keras.optimizers import Adam, rmsprop
+from keras.optimizers import Adam
 from keras.layers.advanced_activations import LeakyReLU
 from keras.losses import binary_crossentropy
 from keras.preprocessing.image import img_to_array
@@ -12,23 +12,23 @@ import tifffile
 import keras.backend as K
 import random
 import os
+from keras.datasets import mnist
 '''fenceGAN implementation
 author@chengyang
 '''
+
 class fenceGAN():
 	def __init__(self):
 		self.image_rows = 28
 		self.image_columns = 28
 		self.image_channels = 1
 		self.image_shape = (self.image_rows, self.image_columns, self.image_channels)
-		self.latent_dim = 10
-		self.batch_size = 256
+		self.latent_dim = 100
+		self.batch_size = 128
 		self.gm = 0.1
 		self.gamma = K.variable([1])
-		# self.g_optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
-		# self.d_optimizer = Adam(lr = 3e-6,beta_1 = 0.5, beta_2 = 0.999, decay = 1e-5)
-		self.g_optimizer = Adam(lr = 3e-5,beta_1 = 0.5, beta_2 = 0.999,decay = 1e-5)
-		self.d_optimizer = Adam(lr = 1e-5,beta_1 = 0.5, beta_2 = 0.999,decay = 1e-5)
+		self.g_optimizer = Adam(0.0002,0.5)
+		self.d_optimizer = Adam(0.0002,0.5)
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
 		self.GAN = self.combined_model()
@@ -36,24 +36,23 @@ class fenceGAN():
 		self.d_loss_array = np.empty((0,1))
 		self.g_loss_array = np.empty((0,1))
 
-		self.num_of_patches = 30000
-		self.num_of_noise = 30000
-		self.num_of_adv = 1000
+		self.num_of_patches = 60000
+		self.num_of_adv = 5000
 		self.num_of_iterations = self.num_of_patches//self.batch_size
-		self.clean_dataset = self.get_dataset(self.num_of_patches,'full-fgsm/train/original')
-		self.clean_dataset = self.clean_dataset.astype('float32')
+		# self.clean_dataset = self.get_dataset(self.num_of_patches,'full-fgsm/test/original')
+		(self.clean_dataset, _), (_, _) = mnist.load_data()
+		self.clean_dataset = self.clean_dataset/127.5 -1
+		self.clean_dataset = np.expand_dims(self.clean_dataset, axis = 3)
 		
-		self.adv_dataset = self.get_dataset(self.num_of_adv,'full-fgsm/train/adversarial')
-		self.adv_dataset = self.adv_dataset.astype('float32')
-		
-		self.noise = np.random.normal(0.5,0.5,(self.num_of_noise,self.latent_dim))
 		
 		self.real_indexes = np.random.randint(0,self.num_of_patches,10)
 		self.adv_indexes = np.random.randint(0,self.num_of_adv,10)
+
 	def get_dataset(self,num_of_patches,path):
 		dataset = np.empty((0,28,28,1))
 		filenames = os.listdir(path)
-		for name in filenames:
+		chosen_names = random.choices(filenames,k = num_of_patches)
+		for name in chosen_names:
 			image = tifffile.imread(os.path.join(path,name))
 			dataset = np.append(dataset,[image],axis = 0)
 		
@@ -61,28 +60,17 @@ class fenceGAN():
 
 	def build_generator(self):
 		model = Sequential()
-		
-		model.add(Dense(16,input_shape = (self.latent_dim,)))
-		model.add(LeakyReLU(alpha = 0.4))
-		model.add(BatchNormalization(momentum = 0.8))
-
-		model.add(Dense(32))
-		model.add(LeakyReLU(alpha = 0.4))
-		model.add(BatchNormalization(momentum = 0.8))
-
-		model.add(Dense(64))
-		model.add(LeakyReLU(alpha = 0.4))
-		model.add(BatchNormalization(momentum = 0.8))
-
-		model.add(Dense(128))
-		model.add(LeakyReLU(alpha = 0.4))
-		model.add(BatchNormalization(momentum = 0.8))
-
-
-		model.add(Dense(np.prod(self.image_shape)))
-		model.add(LeakyReLU(alpha = 0.4))
-		model.add(Reshape(self.image_shape))
-		
+		model.add(Dense(7*7*128,input_dim = self.latent_dim))
+		model.add(ReLU())
+		model.add(Reshape((7,7,128)))
+		model.add(BatchNormalization())
+		model.add(Conv2DTranspose(64,(5,5), strides = 2, padding = 'same', kernel_initializer = 'glorot_normal'))
+		model.add(ReLU())
+		model.add(BatchNormalization())
+		model.add(Conv2DTranspose(1,(5,5), strides = 2, padding = 'same', kernel_initializer = 'glorot_normal'))
+		model.add(Activation('tanh'))
+	
+		model.summary()
 		return model
 
 
@@ -94,22 +82,30 @@ class fenceGAN():
 
 	def build_discriminator(self):
 		model = Sequential()
+
+		model.add(Conv2D(32,(3,3),strides = 2,padding = 'same',input_shape = self.image_shape))
+		model.add(LeakyReLU(alpha = 0.2))
+		model.add(BatchNormalization())
 		
-		model.add(Flatten(input_shape = self.image_shape))
+		model.add(Conv2D(64,(3,3),strides = 2,padding = 'same'))
+		model.add(LeakyReLU(alpha = 0.2))
+		model.add(BatchNormalization())
 
-		model.add(Dense(64))
-		model.add(LeakyReLU(alpha = 0.4))
+		model.add(Conv2D(128,(3,3),strides = 2,padding = 'same'))
+		model.add(LeakyReLU(alpha = 0.2))
+		model.add(BatchNormalization())
 
-		model.add(Dense(128))
-		model.add(LeakyReLU(alpha = 0.4))
+		model.add(Conv2D(256,(3,3),strides = 2,padding = 'same'))
+		model.add(LeakyReLU(alpha = 0.2))
+		model.add(BatchNormalization())
 
-		model.add(Dense(256))
-		model.add(LeakyReLU(alpha = 0.4))
+		model.add(GlobalAveragePooling2D())
 
 		model.add(Dense(1,activation = 'sigmoid'))
 		model.compile(loss = self.weighted_d_loss, 
 			optimizer = self.d_optimizer)
 		
+		model.summary()
 		return model
 
 	def combined_model(self):
@@ -125,14 +121,13 @@ class fenceGAN():
 		return combined_model
 
 	def pretrain(self):
-		for epoch in range(20):
+		for epoch in range(100):
 			#get batch of clean patches
 			real_index = np.random.randint(0,self.num_of_patches,self.batch_size)
 			batch_real = self.clean_dataset[real_index]
 			real_label = np.ones(self.batch_size)
 			#get batch of noise
-			fake_index_for_d = np.random.randint(0,self.num_of_noise,self.batch_size)
-			batch_noise_d = self.noise[fake_index_for_d]
+			batch_noise_d = np.random.normal(0,1,(self.batch_size,self.latent_dim))
 			noise_label = np.zeros(self.batch_size)
 			
 			fake_generated_1 = self.G.predict(batch_noise_d)
@@ -157,43 +152,46 @@ class fenceGAN():
 				batch_real = self.clean_dataset[real_index]
 				
 				#get batch of noise
-				fake_index_for_d = np.random.randint(0,self.num_of_noise,self.batch_size)
-				batch_noise_d = self.noise[fake_index_for_d]
-				fake_index_for_g = np.random.randint(0,self.num_of_noise,2*self.batch_size)
-				batch_noise_g = self.noise[fake_index_for_g]
+				batch_noise_d = np.random.normal(0,1,(self.batch_size,self.latent_dim))
+				batch_noise_g = np.random.normal(0,1,(2*self.batch_size,self.latent_dim))
 				
 				#label for noise, clean patches and generator training
 				real_label = np.ones(self.batch_size)
 				noise_label = np.zeros(self.batch_size)
 				half_label = np.zeros(2*self.batch_size)
-				half_label[:] = 0.6
+				half_label[:] = 1
 				
 				#train discriminator
 				fake_generated_1 = self.G.predict(batch_noise_d)
 				self.D.trainable = True
 				K.set_value(self.gamma,[self.gm])
-				epoch_d_loss += self.D.train_on_batch(fake_generated_1,noise_label)
+				iteration_d_loss_fake = self.D.train_on_batch(fake_generated_1,noise_label)
+				
 				K.set_value(self.gamma,[1])
-				epoch_d_loss += self.D.train_on_batch(batch_real,real_label)
 				
-				#record discriminator loss
-				# d_loss = 5*d_loss_1 + 5*d_loss_2
+				iteration_d_loss_real = self.D.train_on_batch(batch_real,real_label)
+
 				
-				
+				iteration_d_loss = 0.5 * np.add(iteration_d_loss_fake,iteration_d_loss_real)
+
+
 				#train generator
 				self.D.trainable = False
-				epoch_g_loss += self.GAN.train_on_batch(batch_noise_g,half_label)
-				
-				#record generator loss
+				iteration_g_loss = self.GAN.train_on_batch(batch_noise_g,half_label)
+				print('D loss %0.5f G loss %0.5f'%(iteration_d_loss,iteration_g_loss))
+				epoch_d_loss += iteration_d_loss
+				epoch_g_loss += iteration_g_loss
+				if iteration%50 == 0:
+					self.progress_report(iteration)
+					self.report_scores(iteration)
 			epoch_g_loss /= 500
 			epoch_d_loss /= 50
 			self.g_loss_array = np.append(self.g_loss_array,np.array([[epoch_g_loss]]),axis = 0)
-			self.d_loss_array = np.append(self.d_loss_array,np.array([[epoch_d_loss]]),axis=0)
+			self.d_loss_array = np.append(self.d_loss_array,np.array([[epoch_d_loss]]),axis = 0)
 			self.plot_losses()
 			print('epoch%d d_loss:%f'%(epoch,epoch_d_loss))
 			print('epoch%d g_loss:%f'%(epoch,epoch_g_loss))
-			self.report_scores(epoch)
-			self.progress_report(epoch)
+
 	def report_scores(self,epoch):
 		#get 1000 clean patches
 		real_index = np.random.randint(0,self.num_of_patches,1000)
@@ -201,12 +199,13 @@ class fenceGAN():
 		validity_d = self.D.predict(batch_real)
 		
 		#get 1000 noise
-		fake_index = np.random.randint(0,self.num_of_noise,1000)
-		batch_noise = self.noise[fake_index]
+		batch_noise = np.random.normal(0,1,(1000,self.latent_dim))
 		validity_g = self.GAN.predict(batch_noise)
 		
 		#get 1000 adv patches
-		validity_a = self.D.predict(self.adv_dataset)
+		batch_adv = self.get_dataset(1000, 'full-fgsm/test/adversarial')
+		batch_adv = batch_adv*2 -1
+		validity_a = self.D.predict(batch_adv)
 		
 		sns.distplot(validity_d,hist = True,rug = False,label = 'real')
 		sns.distplot(validity_g,hist = True,rug = False,label = 'generated')
@@ -225,7 +224,7 @@ class fenceGAN():
 		plt.ylabel('loss')
 		plt.xlabel('iteration')
 		plt.legend(['discriminator', 'generator'], loc='upper right')
-		plt.savefig("loss-graph/loss.png")
+		plt.savefig("plots/loss.png")
 		plt.close()
 	
 	def save_generated_images(self):
@@ -243,12 +242,14 @@ class fenceGAN():
 		batch_real = self.clean_dataset[self.real_indexes]
 		validity_d = self.D.predict(batch_real)
 		
-		batch_noise = self.noise[:10]
+		batch_noise = np.random.normal(0,1,(10,self.latent_dim))
 		batch_generated = self.G.predict(batch_noise)
 		validity_g = self.GAN.predict(batch_noise)
 
-		batch_adv = self.adv_dataset[self.adv_indexes]
+		batch_adv = self.get_dataset(10, 'full-fgsm/test/adversarial')
+		batch_adv = batch_adv*2 -1
 		validity_a = self.D.predict(batch_adv)
+
 		
 		fig, axs = plt.subplots(row,column)
 		for j in range(column):
@@ -270,7 +271,6 @@ class fenceGAN():
 		plt.close()
 
 fenceGAN = fenceGAN()
-# fenceGAN.pretrain()
+fenceGAN.pretrain()
 fenceGAN.train(100)
 fenceGAN.save_model()
-fenceGAN.save_generated_images()
