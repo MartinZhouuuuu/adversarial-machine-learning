@@ -18,8 +18,8 @@ author@chengyang
 
 class fenceGAN():
 	def __init__(self):
-		self.image_rows = 28
-		self.image_columns = 28
+		self.image_rows = 5
+		self.image_columns = 5
 		self.image_channels = 1
 		self.image_shape = (self.image_rows, self.image_columns, self.image_channels)
 		self.latent_dim = 100
@@ -38,7 +38,7 @@ class fenceGAN():
 		self.num_of_iterations = 10000
 
 	def get_dataset(self,num_of_patches,path):
-		dataset = np.empty((0,28,28,1))
+		dataset = np.empty((0,5,5,1))
 		filenames = os.listdir(path)
 		chosen_names = random.choices(filenames,k = num_of_patches)
 		for name in chosen_names:
