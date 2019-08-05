@@ -65,11 +65,9 @@ class Clean_dirty_classifier():
 		model.add(Flatten())
 		model.add(Dense(32))
 		model.add(Activation('relu'))
-		model.add(Dropout(0.5))
 
 		model.add(Dense(16))
 		model.add(Activation('relu'))
-		model.add(Dropout(0.5))
 
 		model.add(Dense(2))
 		model.add(Activation('softmax'))
