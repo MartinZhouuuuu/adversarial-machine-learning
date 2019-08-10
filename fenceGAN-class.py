@@ -24,14 +24,15 @@ class fenceGAN():
 		self.image_shape = (self.image_rows, self.image_columns, self.image_channels)
 		self.latent_dim = 100
 		self.batch_size = 64
-		self.gm = 0.4
+		self.gm = 0.1
+		self.k = 1
+		self.fence_label = 0.5
 		self.gamma = K.variable([1])
 		self.g_optimizer = Adam(0.0002,0.5)
 		self.d_optimizer = Adam(0.0002,0.5)
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
 		self.GAN = self.combined_model()
-
 		self.d_loss_array = np.empty((0,1))
 		self.g_loss_array = np.empty((0,1))
 
@@ -97,7 +98,7 @@ class fenceGAN():
 
 		model.add(Dense(1,activation = 'sigmoid'))
 		model.compile(loss = self.weighted_d_loss, 
-			optimizer = self.d_optimizer, metrics = ['accuracy'])
+			optimizer = self.d_optimizer)
 		model.summary()
 		return model
 
@@ -108,13 +109,13 @@ class fenceGAN():
 		fake_result = self.G(z)
 		validity = self.D(fake_result)
 		combined_model = Model(z,validity)
-		combined_model.compile(loss = 'binary_crossentropy',
+		combined_model.compile(loss = combined_loss(fake_result,15,2),
 			optimizer = self.g_optimizer)
-		# combined_loss(fake_result,10,2)
+		# 
 		return combined_model
 
 	def pretrain(self):
-		for iteration in range(20):
+		for iteration in range(100):
 			#get batch of clean patches
 			batch_real = self.get_dataset(self.batch_size,'full-fgsm/train/original')
 			real_label = np.ones(self.batch_size)
@@ -135,7 +136,7 @@ class fenceGAN():
 			
 			#record discriminator loss
 			d_loss = 0.5 * np.add(d_loss_1,d_loss_2)
-			print('iteration%d d_loss:%f acc%f'%(iteration,d_loss[0],d_loss[1]))
+			print('iteration%d d_loss:%f'%(iteration,d_loss))
 
 	def train(self):
 		for iteration in range(self.num_of_iterations):
@@ -149,9 +150,9 @@ class fenceGAN():
 			real_label = np.ones(self.batch_size)
 			noise_label = np.zeros(self.batch_size)
 			half_label = np.zeros(2*self.batch_size)
-			half_label[:] = 0.6
-			iteration_d_loss = [0,0]
-			for i in range(2):	
+			half_label[:] = self.fence_label
+			iteration_d_loss = [0]
+			for i in range(self.k):	
 				#train discriminator
 				K.set_value(self.gamma,[1])
 				sub_iteration_d_loss_real = self.D.train_on_batch(batch_real,real_label)
@@ -160,13 +161,13 @@ class fenceGAN():
 				K.set_value(self.gamma,[self.gm])
 				sub_iteration_d_loss_fake = self.D.train_on_batch(fake_generated,noise_label)
 
-				sub_iteration_d_loss = 0.25 * np.add(sub_iteration_d_loss_fake,sub_iteration_d_loss_real)
+				sub_iteration_d_loss = (1/self.k) * np.add(sub_iteration_d_loss_fake,sub_iteration_d_loss_real)
 				iteration_d_loss = np.add(iteration_d_loss,sub_iteration_d_loss) 
 			
 			#train generator
 			self.D.trainable = False
 			iteration_g_loss = self.GAN.train_on_batch(batch_noise_g,half_label)
-			print('Iteration%d D loss %0.5f Acc %0.5f G loss %0.5f'%(iteration, iteration_d_loss[0],iteration_d_loss[1],iteration_g_loss))
+			print('Iteration%d D loss %0.5f G loss %0.5f'%(iteration, iteration_d_loss,iteration_g_loss))
 
 			if iteration%50 == 0:
 				self.progress_report(iteration)
@@ -253,8 +254,10 @@ class fenceGAN():
 		fig.savefig('sample-images/%d.png'%iteration)
 		plt.close()
 
+
+
 fenceGAN = fenceGAN()
-fenceGAN.pretrain()
+# fenceGAN.pretrain()
 fenceGAN.train()
 # fenceGAN.save_model()
 
