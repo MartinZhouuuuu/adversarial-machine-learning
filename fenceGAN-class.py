@@ -18,13 +18,13 @@ author@chengyang
 
 class fenceGAN():
 	def __init__(self):
-		self.image_rows = 5
-		self.image_columns = 5
+		self.image_rows = 28
+		self.image_columns = 28
 		self.image_channels = 1
 		self.image_shape = (self.image_rows, self.image_columns, self.image_channels)
 		self.latent_dim = 100
-		self.batch_size = 128
-		self.gm = 0.1
+		self.batch_size = 64
+		self.gm = 0.4
 		self.gamma = K.variable([1])
 		self.g_optimizer = Adam(0.0002,0.5)
 		self.d_optimizer = Adam(0.0002,0.5)
@@ -38,7 +38,7 @@ class fenceGAN():
 		self.num_of_iterations = 10000
 
 	def get_dataset(self,num_of_patches,path):
-		dataset = np.empty((0,5,5,1))
+		dataset = np.empty((0,self.image_rows,self.image_columns,self.image_channels))
 		filenames = os.listdir(path)
 		chosen_names = random.choices(filenames,k = num_of_patches)
 		for name in chosen_names:
@@ -110,7 +110,7 @@ class fenceGAN():
 		combined_model = Model(z,validity)
 		combined_model.compile(loss = 'binary_crossentropy',
 			optimizer = self.g_optimizer)
-		# combined_loss(fake_result,15,2)
+		# combined_loss(fake_result,10,2)
 		return combined_model
 
 	def pretrain(self):
@@ -124,11 +124,13 @@ class fenceGAN():
 			noise_label = np.zeros(self.batch_size)
 			
 			self.D.trainable = True
+
+			K.set_value(self.gamma,[1])
+			
 			fake_generated = self.G.predict(batch_noise_d)
-			K.set_value(self.gamma,[self.gm])
+
 			d_loss_1 = self.D.train_on_batch(fake_generated,noise_label)
 			
-			K.set_value(self.gamma,[1])
 			d_loss_2 = self.D.train_on_batch(batch_real,real_label)
 			
 			#record discriminator loss
@@ -147,19 +149,20 @@ class fenceGAN():
 			real_label = np.ones(self.batch_size)
 			noise_label = np.zeros(self.batch_size)
 			half_label = np.zeros(2*self.batch_size)
-			half_label[:] = 1
+			half_label[:] = 0.6
+			iteration_d_loss = [0,0]
+			for i in range(2):	
+				#train discriminator
+				K.set_value(self.gamma,[1])
+				sub_iteration_d_loss_real = self.D.train_on_batch(batch_real,real_label)
 				
-			#train discriminator
+				fake_generated = self.G.predict(batch_noise_d)
+				K.set_value(self.gamma,[self.gm])
+				sub_iteration_d_loss_fake = self.D.train_on_batch(fake_generated,noise_label)
 
-			fake_generated = self.G.predict(batch_noise_d)
-			K.set_value(self.gamma,[self.gm])
-			iteration_d_loss_fake = self.D.train_on_batch(fake_generated,noise_label)
-				
-			K.set_value(self.gamma,[1])
-			iteration_d_loss_real = self.D.train_on_batch(batch_real,real_label)
-
-			iteration_d_loss = 0.5 * np.add(iteration_d_loss_fake,iteration_d_loss_real)
-
+				sub_iteration_d_loss = 0.25 * np.add(sub_iteration_d_loss_fake,sub_iteration_d_loss_real)
+				iteration_d_loss = np.add(iteration_d_loss,sub_iteration_d_loss) 
+			
 			#train generator
 			self.D.trainable = False
 			iteration_g_loss = self.GAN.train_on_batch(batch_noise_g,half_label)
