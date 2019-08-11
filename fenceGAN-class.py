@@ -28,8 +28,8 @@ class fenceGAN():
 		self.k = 1
 		self.fence_label = 0.5
 		self.gamma = K.variable([1])
-		self.g_optimizer = Adam(0.0002,0.5)
-		self.d_optimizer = Adam(0.0002,0.5)
+		self.g_optimizer = Adam(0.00002,0.5)
+		self.d_optimizer = Adam(0.00002,0.5)
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
 		self.GAN = self.combined_model()
@@ -40,7 +40,10 @@ class fenceGAN():
 
 	def get_dataset(self,num_of_patches,path):
 		dataset = np.empty((0,self.image_rows,self.image_columns,self.image_channels))
-		filenames = os.listdir(path)
+		filenames = []
+		for file in os.listdir(path):
+			if file.endswith('.tif'):
+				filenames.append(file) 
 		chosen_names = random.choices(filenames,k = num_of_patches)
 		for name in chosen_names:
 			image = tifffile.imread(os.path.join(path,name))
@@ -80,17 +83,17 @@ class fenceGAN():
 		model.add(LeakyReLU(alpha = 0.2))
 		
 		model.add(Conv2D(64,(3,3),strides = 2,padding = 'same'))
-		model.add(BatchNormalization())
+		# model.add(BatchNormalization())
 		model.add(LeakyReLU(alpha = 0.2))
 		
 
 		model.add(Conv2D(128,(3,3),strides = 2,padding = 'same'))
-		model.add(BatchNormalization())
+		# model.add(BatchNormalization())
 		model.add(LeakyReLU(alpha = 0.2))
 		
 
 		model.add(Conv2D(256,(3,3),strides = 2,padding = 'same'))
-		model.add(BatchNormalization())
+		# model.add(BatchNormalization())
 		model.add(LeakyReLU(alpha = 0.2))
 		
 
@@ -172,6 +175,7 @@ class fenceGAN():
 			if iteration%50 == 0:
 				self.progress_report(iteration)
 				self.report_scores(iteration)
+				self.save_model()
 				
 			self.g_loss_array = np.append(self.g_loss_array,np.array([[iteration_g_loss]]),axis = 0)
 			self.d_loss_array = np.append(self.d_loss_array,np.array([[iteration_d_loss[0]]]),axis = 0)
@@ -190,9 +194,9 @@ class fenceGAN():
 		batch_adv = self.get_dataset(1000, 'full-fgsm/test/adversarial')
 		validity_a = self.D.predict(batch_adv)
 		
-		sns.distplot(validity_d,hist = True,rug = False,label = 'real')
-		sns.distplot(validity_g,hist = True,rug = False,label = 'generated')
-		sns.distplot(validity_a,hist = True,rug = False,label = 'adversarial')
+		sns.distplot(validity_d,hist = True,rug = False,label = 'real',kde = False)
+		sns.distplot(validity_g,hist = True,rug = False,label = 'generated', kde = False)
+		sns.distplot(validity_a,hist = True,rug = False,label = 'adversarial', kde = False)
 		plt.legend(prop={'size': 14})
 		plt.title('Density Plot of different patches')
 		plt.xlabel('discriminator score')
@@ -255,8 +259,10 @@ class fenceGAN():
 		plt.close()
 
 
-
 fenceGAN = fenceGAN()
+# fenceGAN.D = load_model('/Users/apple/Desktop/8350/D.h5',custom_objects = {'weighted_d_loss' = fenceGAN.weighted_d_loss})
+# fenceGAN.progress_report(10000)
+# fenceGAN.report_scores(10000)
 # fenceGAN.pretrain()
 fenceGAN.train()
 # fenceGAN.save_model()

@@ -6,9 +6,10 @@ import tifffile
 import os
 import random
 
+
 image = tifffile.imread(
-	'/Users/apple/Google Drive/adversarial-machine-learning/patches/test/original/49.tif'
+	'/Users/apple/Documents/adversarial-machine-learning/full-fgsm/test/original/5121.tif'
 	)
-model = load_model('model-files/classifier-5.h5')
-prediction = model.predict(image.reshape(1,5,5,1))
+model = load_model('/Users/apple/Desktop/8350/D.h5')
+prediction = model.predict(image.reshape(1,28,28,1))
 print(prediction)
