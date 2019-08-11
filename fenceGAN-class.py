@@ -47,6 +47,7 @@ class fenceGAN():
 		chosen_names = random.choices(filenames,k = num_of_patches)
 		for name in chosen_names:
 			image = tifffile.imread(os.path.join(path,name))
+			image = image.reshape(28,28,1)
 			dataset = np.append(dataset,[image],axis = 0)
 		dataset = self.rescale(dataset)
 		return dataset
@@ -184,6 +185,7 @@ class fenceGAN():
 	def report_scores(self,iteration):
 		#get 1000 clean patches
 		batch_real = self.get_dataset(1000,'full-fgsm/train/original')
+		print(batch_real[0])
 		validity_d = self.D.predict(batch_real)
 		
 		#get 1000 noise
@@ -191,7 +193,8 @@ class fenceGAN():
 		validity_g = self.GAN.predict(batch_noise)
 		
 		# get 1000 adv patches
-		batch_adv = self.get_dataset(1000, 'full-fgsm/test/adversarial')
+		batch_adv = self.get_dataset(1000, '/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma')
+		print(batch_adv[0])
 		validity_a = self.D.predict(batch_adv)
 		
 		sns.distplot(validity_d,hist = True,rug = False,label = 'real',kde = False)
@@ -236,7 +239,7 @@ class fenceGAN():
 		validity_g = self.GAN.predict(batch_noise)
 
 
-		batch_adv = self.get_dataset(10,'full-fgsm/test/adversarial')
+		batch_adv = self.get_dataset(10,'/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma')
 		validity_a = self.D.predict(batch_adv)
 		
 		fig, axs = plt.subplots(row,column)
@@ -260,11 +263,11 @@ class fenceGAN():
 
 
 fenceGAN = fenceGAN()
-# fenceGAN.D = load_model('/Users/apple/Desktop/8350/D.h5',custom_objects = {'weighted_d_loss' = fenceGAN.weighted_d_loss})
+# fenceGAN.D = load_model('model-files/D.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
 # fenceGAN.progress_report(10000)
 # fenceGAN.report_scores(10000)
 # fenceGAN.pretrain()
-fenceGAN.train()
+# fenceGAN.train()
 # fenceGAN.save_model()
 
 
