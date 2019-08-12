@@ -28,8 +28,9 @@ class fenceGAN():
 		self.k = 1
 		self.fence_label = 0.5
 		self.gamma = K.variable([1])
-		self.g_optimizer = Adam(0.00002,0.5)
-		self.d_optimizer = Adam(0.00002,0.5)
+		self.g_optimizer = Adam(0.00002,decay = 1e-4)
+		self.d_optimizer = Adam(0.00001,decay = 1e-4)
+		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma'
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
 		self.GAN = self.combined_model()
@@ -54,14 +55,17 @@ class fenceGAN():
 
 	def build_generator(self):
 		model = Sequential()
-		model.add(Dense(7*7*128,input_dim = self.latent_dim))
+		model.add(Dense(1024,input_dim = self.latent_dim))
+		model.add(BatchNormalization())
+		model.add(ReLU())
+		model.add(Dense(7*7*128))
 		model.add(BatchNormalization())
 		model.add(ReLU())
 		model.add(Reshape((7,7,128)))
-		model.add(Conv2DTranspose(64,(5,5), strides = 2, padding = 'same', kernel_initializer = 'glorot_normal'))
+		model.add(Conv2DTranspose(64,(4,4), strides = 2, padding = 'same'))
 		model.add(BatchNormalization())
 		model.add(ReLU())
-		model.add(Conv2DTranspose(1,(5,5), strides = 2, padding = 'same', kernel_initializer = 'glorot_normal'))
+		model.add(Conv2DTranspose(1,(4,4), strides = 2, padding = 'same'))
 		model.add(Activation('tanh'))
 	
 		model.summary()
@@ -80,25 +84,15 @@ class fenceGAN():
 	def build_discriminator(self):
 		model = Sequential()
 
-		model.add(Conv2D(32,(3,3),strides = 2,padding = 'same',input_shape = self.image_shape))
-		model.add(LeakyReLU(alpha = 0.2))
+		model.add(Conv2D(64,(4,4),strides = 2,padding = 'same',input_shape = self.image_shape))
+		model.add(LeakyReLU(alpha = 0.1))
 		
-		model.add(Conv2D(64,(3,3),strides = 2,padding = 'same'))
-		# model.add(BatchNormalization())
-		model.add(LeakyReLU(alpha = 0.2))
+		model.add(Conv2D(64,(4,4),strides = 2,padding = 'same'))
+		model.add(LeakyReLU(alpha = 0.1))
 		
-
-		model.add(Conv2D(128,(3,3),strides = 2,padding = 'same'))
-		# model.add(BatchNormalization())
-		model.add(LeakyReLU(alpha = 0.2))
-		
-
-		model.add(Conv2D(256,(3,3),strides = 2,padding = 'same'))
-		# model.add(BatchNormalization())
-		model.add(LeakyReLU(alpha = 0.2))
-		
-
-		model.add(GlobalAveragePooling2D())
+		model.add(Flatten())
+		model.add(Dense(1024))
+		model.add(LeakyReLU(alpha = 0.1))
 
 		model.add(Dense(1,activation = 'sigmoid'))
 		model.compile(loss = self.weighted_d_loss, 
@@ -113,7 +107,7 @@ class fenceGAN():
 		fake_result = self.G(z)
 		validity = self.D(fake_result)
 		combined_model = Model(z,validity)
-		combined_model.compile(loss = combined_loss(fake_result,15,2),
+		combined_model.compile(loss = combined_loss(fake_result,30,2),
 			optimizer = self.g_optimizer)
 		# 
 		return combined_model
@@ -185,16 +179,15 @@ class fenceGAN():
 	def report_scores(self,iteration):
 		#get 1000 clean patches
 		batch_real = self.get_dataset(1000,'full-fgsm/train/original')
-		print(batch_real[0])
 		validity_d = self.D.predict(batch_real)
 		
 		#get 1000 noise
 		batch_noise = np.random.normal(0,1,(1000,self.latent_dim))
-		validity_g = self.GAN.predict(batch_noise)
+		batch_generated = self.G.predict(batch_noise)
+		validity_g = self.D.predict(batch_generated)
 		
 		# get 1000 adv patches
-		batch_adv = self.get_dataset(1000, '/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma')
-		print(batch_adv[0])
+		batch_adv = self.get_dataset(1000, self.adv_set)
 		validity_a = self.D.predict(batch_adv)
 		
 		sns.distplot(validity_d,hist = True,rug = False,label = 'real',kde = False)
@@ -221,7 +214,7 @@ class fenceGAN():
 		noise = np.random.normal(0,1,(1000,self.latent_dim))
 		generated_patches = self.G.predict(noise)
 		for x in range(generated_patches.shape[0]):
-			tifffile.imsave('generated-patches/%d.tif'%x,generated_patches[x])
+			tifffile.imsave('generated-images/%d.tif'%x,generated_patches[x])
 
 	def save_model(self):
 		self.G.save('model-files/G.h5')
@@ -236,10 +229,10 @@ class fenceGAN():
 		
 		batch_noise = np.random.normal(0,1,(10,self.latent_dim))
 		batch_generated = self.G.predict(batch_noise)
-		validity_g = self.GAN.predict(batch_noise)
+		validity_g = self.D.predict(batch_generated)
 
 
-		batch_adv = self.get_dataset(10,'/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma')
+		batch_adv = self.get_dataset(10,self.adv_set)
 		validity_a = self.D.predict(batch_adv)
 		
 		fig, axs = plt.subplots(row,column)
@@ -263,18 +256,12 @@ class fenceGAN():
 
 
 fenceGAN = fenceGAN()
-# fenceGAN.D = load_model('model-files/D.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
-# fenceGAN.progress_report(10000)
-# fenceGAN.report_scores(10000)
+fenceGAN.D = load_model('model-files/D.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
+fenceGAN.G = load_model('model-files/G.h5',custom_objects = {'g_loss' : combined_loss})
+fenceGAN.progress_report(10000)
+fenceGAN.report_scores(10000)
+# fenceGAN.save_generated_images()
 # fenceGAN.pretrain()
 # fenceGAN.train()
 # fenceGAN.save_model()
-
-
-
-
-
-
-
-
 
