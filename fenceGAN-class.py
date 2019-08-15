@@ -1,3 +1,4 @@
+import tensorflow as tf 
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -6,38 +7,53 @@ from keras.models import Sequential,Model,load_model
 from keras.optimizers import Adam
 from keras.layers.advanced_activations import LeakyReLU
 from keras.losses import binary_crossentropy
-from keras.preprocessing.image import img_to_array
-from custom_losses import *
+from custom_losses import combined_loss
 import tifffile
 import keras.backend as K
 import random
 import os
+
 '''fenceGAN implementation
 author@chengyang
 '''
 
 class fenceGAN():
 	def __init__(self):
+		#image info
 		self.image_rows = 28
 		self.image_columns = 28
 		self.image_channels = 1
 		self.image_shape = (self.image_rows, self.image_columns, self.image_channels)
+		
+		#noise
 		self.latent_dim = 100
-		self.batch_size = 64
+		
+		#weighted loss hyperparameters
 		self.gm = 0.1
+		self.gamma = K.variable([1])
+		self.beta = 30
+		
+		#every g training, k turns of d training 
 		self.k = 1
 		self.fence_label = 0.5
-		self.gamma = K.variable([1])
+		
+		#path to adv iamges
+		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma-1000'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
+		
+		#models
 		self.g_optimizer = Adam(0.00002,decay = 1e-4)
 		self.d_optimizer = Adam(0.00001,decay = 1e-4)
-		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma'
 		self.G = self.build_generator()
 		self.D = self.build_discriminator()
 		self.GAN = self.combined_model()
+
+		#record down loss
 		self.d_loss_array = np.empty((0,1))
 		self.g_loss_array = np.empty((0,1))
 
+		#training info
 		self.num_of_iterations = 10000
+		self.batch_size = 64
 
 	def get_dataset(self,num_of_patches,path):
 		dataset = np.empty((0,self.image_rows,self.image_columns,self.image_channels))
@@ -55,23 +71,30 @@ class fenceGAN():
 
 	def build_generator(self):
 		model = Sequential()
+		
 		model.add(Dense(1024,input_dim = self.latent_dim))
 		model.add(BatchNormalization())
 		model.add(ReLU())
+		
 		model.add(Dense(7*7*128))
 		model.add(BatchNormalization())
 		model.add(ReLU())
+		
 		model.add(Reshape((7,7,128)))
+		
 		model.add(Conv2DTranspose(64,(4,4), strides = 2, padding = 'same'))
 		model.add(BatchNormalization())
 		model.add(ReLU())
+		
 		model.add(Conv2DTranspose(1,(4,4), strides = 2, padding = 'same'))
 		model.add(Activation('tanh'))
-	
+		
 		model.summary()
+		
 		return model
 
 	def rescale(self,images):
+		#rescaling to -1 to 1
 		images = images*2 -1
 		return images
 
@@ -97,7 +120,9 @@ class fenceGAN():
 		model.add(Dense(1,activation = 'sigmoid'))
 		model.compile(loss = self.weighted_d_loss, 
 			optimizer = self.d_optimizer)
+		
 		model.summary()
+		
 		return model
 
 	def combined_model(self):
@@ -106,10 +131,11 @@ class fenceGAN():
 		z = Input(shape = (self.latent_dim,))
 		fake_result = self.G(z)
 		validity = self.D(fake_result)
+		
 		combined_model = Model(z,validity)
-		combined_model.compile(loss = combined_loss(fake_result,30,2),
+		combined_model.compile(loss = combined_loss(fake_result,self.beta,2),
 			optimizer = self.g_optimizer)
-		# 
+
 		return combined_model
 
 	def pretrain(self):
@@ -123,13 +149,10 @@ class fenceGAN():
 			noise_label = np.zeros(self.batch_size)
 			
 			self.D.trainable = True
-
 			K.set_value(self.gamma,[1])
 			
 			fake_generated = self.G.predict(batch_noise_d)
-
 			d_loss_1 = self.D.train_on_batch(fake_generated,noise_label)
-			
 			d_loss_2 = self.D.train_on_batch(batch_real,real_label)
 			
 			#record discriminator loss
@@ -138,8 +161,9 @@ class fenceGAN():
 
 	def train(self):
 		for iteration in range(self.num_of_iterations):
-			##get batch of clean patches
+			#get batch of clean patches
 			batch_real = self.get_dataset(self.batch_size,'full-fgsm/train/original')
+			
 			#get batch of noise
 			batch_noise_d = np.random.normal(0,1,(self.batch_size,self.latent_dim))
 			batch_noise_g = np.random.normal(0,1,(2*self.batch_size,self.latent_dim))
@@ -150,6 +174,7 @@ class fenceGAN():
 			half_label = np.zeros(2*self.batch_size)
 			half_label[:] = self.fence_label
 			iteration_d_loss = [0]
+			
 			for i in range(self.k):	
 				#train discriminator
 				K.set_value(self.gamma,[1])
@@ -167,32 +192,43 @@ class fenceGAN():
 			iteration_g_loss = self.GAN.train_on_batch(batch_noise_g,half_label)
 			print('Iteration%d D loss %0.5f G loss %0.5f'%(iteration, iteration_d_loss,iteration_g_loss))
 
+			self.g_loss_array = np.append(self.g_loss_array,np.array([[iteration_g_loss]]),axis = 0)
+			self.d_loss_array = np.append(self.d_loss_array,np.array([[iteration_d_loss[0]]]),axis = 0)
+
 			if iteration%50 == 0:
 				self.progress_report(iteration)
 				self.report_scores(iteration)
 				self.save_model()
-				
-			self.g_loss_array = np.append(self.g_loss_array,np.array([[iteration_g_loss]]),axis = 0)
-			self.d_loss_array = np.append(self.d_loss_array,np.array([[iteration_d_loss[0]]]),axis = 0)
-			self.plot_losses()
+				self.plot_losses()
 
-	def report_scores(self,iteration):
+	def report_scores(self,iteration,num_bins = 50):
+		#plot score distribution for 1000 samples from each class
+
 		#get 1000 clean patches
 		batch_real = self.get_dataset(1000,'full-fgsm/train/original')
 		validity_d = self.D.predict(batch_real)
-		
+		print('real mean:%0.3f'%(np.mean(validity_d)))
+		print('real SD:%0.3f'%(np.std(validity_d)))
+
 		#get 1000 noise
 		batch_noise = np.random.normal(0,1,(1000,self.latent_dim))
 		batch_generated = self.G.predict(batch_noise)
 		validity_g = self.D.predict(batch_generated)
 		
+		batch_noise_2 = np.random.normal(0,1,(1000,784))
+		batch_noise_2 = batch_noise_2.reshape(1000,28,28,1)
+		validity_n = self.D.predict(batch_noise_2)
+
 		# get 1000 adv patches
 		batch_adv = self.get_dataset(1000, self.adv_set)
 		validity_a = self.D.predict(batch_adv)
+		print('adv mean:%0.3f'%(np.mean(validity_a)))
+		print('adv SD:%0.3f'%(np.std(validity_a)))
 		
-		sns.distplot(validity_d,hist = True,rug = False,label = 'real',kde = False)
-		sns.distplot(validity_g,hist = True,rug = False,label = 'generated', kde = False)
-		sns.distplot(validity_a,hist = True,rug = False,label = 'adversarial', kde = False)
+		sns.distplot(validity_d,hist = True,rug = False,label = 'real',kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
+		sns.distplot(validity_g,hist = True,rug = False,label = 'generated', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
+		sns.distplot(validity_a,hist = True,rug = False,label = 'adversarial', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
+		sns.distplot(validity_n,hist = True,rug = False,label = 'noise', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
 		plt.legend(prop={'size': 14})
 		plt.title('Density Plot of different patches')
 		plt.xlabel('discriminator score')
@@ -258,10 +294,7 @@ class fenceGAN():
 fenceGAN = fenceGAN()
 fenceGAN.D = load_model('model-files/D.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
 fenceGAN.G = load_model('model-files/G.h5',custom_objects = {'g_loss' : combined_loss})
-fenceGAN.progress_report(10000)
+# fenceGAN.progress_report(10000)
 fenceGAN.report_scores(10000)
-# fenceGAN.save_generated_images()
-# fenceGAN.pretrain()
 # fenceGAN.train()
-# fenceGAN.save_model()
 
