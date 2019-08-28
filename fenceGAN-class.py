@@ -292,9 +292,9 @@ class fenceGAN():
 
 
 fenceGAN = fenceGAN()
-fenceGAN.D = load_model('model-files/D.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
-fenceGAN.G = load_model('model-files/G.h5',custom_objects = {'g_loss' : combined_loss})
-# fenceGAN.progress_report(10000)
+fenceGAN.D = load_model('model-files/D-good-fence.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
+fenceGAN.G = load_model('model-files/G-good-fence.h5',custom_objects = {'g_loss' : combined_loss})
+fenceGAN.progress_report(10000)
 fenceGAN.report_scores(10000)
 # fenceGAN.train()
 
