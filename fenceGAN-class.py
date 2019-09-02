@@ -38,7 +38,7 @@ class fenceGAN():
 		self.fence_label = 0.5
 		
 		#path to adv iamges
-		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/jsma-1000'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
+		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/deepfool'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
 		
 		#models
 		self.g_optimizer = Adam(0.00002,decay = 1e-4)
@@ -203,32 +203,58 @@ class fenceGAN():
 
 	def report_scores(self,iteration,num_bins = 50):
 		#plot score distribution for 1000 samples from each class
-
+		from keras.preprocessing.image import array_to_img
 		#get 1000 clean patches
 		batch_real = self.get_dataset(1000,'full-fgsm/train/original')
 		validity_d = self.D.predict(batch_real)
 		print('real mean:%0.3f'%(np.mean(validity_d)))
 		print('real SD:%0.3f'%(np.std(validity_d)))
-
 		#get 1000 noise
 		batch_noise = np.random.normal(0,1,(1000,self.latent_dim))
 		batch_generated = self.G.predict(batch_noise)
 		validity_g = self.D.predict(batch_generated)
 		
-		batch_noise_2 = np.random.normal(0,1,(1000,784))
-		batch_noise_2 = batch_noise_2.reshape(1000,28,28,1)
-		validity_n = self.D.predict(batch_noise_2)
+		# batch_noise_2 = np.random.normal(0,1,(1000,784))
+		# batch_noise_2 = batch_noise_2.reshape(1000,28,28,1)
+		# validity_n = self.D.predict(batch_noise_2)
 
 		# get 1000 adv patches
 		batch_adv = self.get_dataset(1000, self.adv_set)
+		print(type(batch_adv))
+		print(batch_adv.shape)
 		validity_a = self.D.predict(batch_adv)
 		print('adv mean:%0.3f'%(np.mean(validity_a)))
 		print('adv SD:%0.3f'%(np.std(validity_a)))
 		
+		'''
+		for index in range(1000):
+			if validity_d[index] <0.5:
+				image = batch_real[index]
+				image = (image+1)/2
+				# tifffile.imsave('scores/deepfool/low/%d.tif'%index,image)
+
+				temp_image = array_to_img(image)
+				plt.imshow(temp_image,cmap = 'gray')
+				plt.title('%0.3f'%validity_d[index],size = 15)
+			
+				plt.savefig('scores/real/low/%d.tif'%index)
+				plt.close()
+				
+			else:
+				image = batch_real[index]
+				image = (image+1)/2
+				# tifffile.imsave('scores/deepfool/high/%d.tif'%index,image)
+				temp_image = array_to_img(image)
+				plt.imshow(temp_image,cmap = 'gray')
+				plt.title('%0.3f'%validity_d[index],size = 15)
+			
+				plt.savefig('scores/real/high/%d.tif'%index)
+				plt.close()
+		'''	
 		sns.distplot(validity_d,hist = True,rug = False,label = 'real',kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
 		sns.distplot(validity_g,hist = True,rug = False,label = 'generated', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
 		sns.distplot(validity_a,hist = True,rug = False,label = 'adversarial', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
-		sns.distplot(validity_n,hist = True,rug = False,label = 'noise', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
+		# sns.distplot(validity_n,hist = True,rug = False,label = 'noise', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
 		plt.legend(prop={'size': 14})
 		plt.title('Density Plot of different patches')
 		plt.xlabel('discriminator score')
@@ -294,7 +320,7 @@ class fenceGAN():
 fenceGAN = fenceGAN()
 fenceGAN.D = load_model('model-files/D-good-fence.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
 fenceGAN.G = load_model('model-files/G-good-fence.h5',custom_objects = {'g_loss' : combined_loss})
-fenceGAN.progress_report(10000)
+# fenceGAN.progress_report(10000)
 fenceGAN.report_scores(10000)
 # fenceGAN.train()
 
