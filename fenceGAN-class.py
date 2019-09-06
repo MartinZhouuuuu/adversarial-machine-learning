@@ -7,11 +7,14 @@ from keras.models import Sequential,Model,load_model
 from keras.optimizers import Adam
 from keras.layers.advanced_activations import LeakyReLU
 from keras.losses import binary_crossentropy
+from keras.preprocessing.image import array_to_img
 from custom_losses import combined_loss
 import tifffile
 import keras.backend as K
 import random
 import os
+from sklearn.metrics import precision_recall_curve,auc,roc_curve, roc_auc_score
+
 
 '''fenceGAN implementation
 author@chengyang
@@ -38,7 +41,7 @@ class fenceGAN():
 		self.fence_label = 0.5
 		
 		#path to adv iamges
-		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/deepfool'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
+		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/c&w'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
 		
 		#models
 		self.g_optimizer = Adam(0.00002,decay = 1e-4)
@@ -203,7 +206,6 @@ class fenceGAN():
 
 	def report_scores(self,iteration,num_bins = 50):
 		#plot score distribution for 1000 samples from each class
-		from keras.preprocessing.image import array_to_img
 		#get 1000 clean patches
 		batch_real = self.get_dataset(1000,'full-fgsm/train/original')
 		validity_d = self.D.predict(batch_real)
@@ -220,11 +222,11 @@ class fenceGAN():
 
 		# get 1000 adv patches
 		batch_adv = self.get_dataset(1000, self.adv_set)
-		print(type(batch_adv))
-		print(batch_adv.shape)
 		validity_a = self.D.predict(batch_adv)
 		print('adv mean:%0.3f'%(np.mean(validity_a)))
 		print('adv SD:%0.3f'%(np.std(validity_a)))
+
+
 		
 		'''
 		for index in range(1000):
@@ -316,11 +318,41 @@ class fenceGAN():
 		fig.savefig('sample-images/%d.png'%iteration)
 		plt.close()
 
+	def roc_prc_curve(self):
+		batch_real = self.get_dataset(10000,'full-fgsm/train/original')
+		validity_d = self.D.predict(batch_real)
+
+		batch_adv = self.get_dataset(1000, self.adv_set)
+		validity_a = self.D.predict(batch_adv)
+
+		total_validity = np.append(validity_d, validity_a)
+		labels = np.append(np.ones((10000,1)), np.zeros((1000,1)))
+
+		precision,recall,threshold = precision_recall_curve(labels,total_validity)
+		plt.plot([0, 1], [0.5, 0.5], linestyle='--')
+		plt.plot(recall, precision)
+		plt.title('PRC curve for c&w')
+		plt.savefig('plots/PRC-c&w.png')
+		plt.close()
+		
+		'''
+		fpr, tpr, thresholds = roc_curve(label,predicted)
+		plt.plot([0, 1], [0, 1], linestyle='--')
+		plt.plot(fpr, tpr)
+		plt.title('ROC curve for igsm')
+		auc = roc_auc_score(label, predicted)
+		plt.text(0.8, 0.1, 'auc score %.3f'% auc)
+		plt.savefig('plots/ROC-igsm.png')
+		plt.close()
+		print(fpr,tpr)
+
+		'''
 
 fenceGAN = fenceGAN()
 fenceGAN.D = load_model('model-files/D-good-fence.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
 fenceGAN.G = load_model('model-files/G-good-fence.h5',custom_objects = {'g_loss' : combined_loss})
 # fenceGAN.progress_report(10000)
-fenceGAN.report_scores(10000)
+# fenceGAN.report_scores(10000)
+fenceGAN.roc_prc_curve()
 # fenceGAN.train()
 
