@@ -15,7 +15,6 @@ import random
 import os
 from sklearn.metrics import precision_recall_curve,auc,roc_curve, roc_auc_score
 
-
 '''fenceGAN implementation
 author@chengyang
 '''
@@ -40,8 +39,10 @@ class fenceGAN():
 		self.k = 1
 		self.fence_label = 0.5
 		
+		self.root_path = 'D:/ML/adversarial-machine-learning'
+
 		#path to adv iamges
-		self.adv_set = '/Users/apple/Google Drive/HCI_BII_Research/adv-images/c&w'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
+		self.adv_set = self.root_path + '/adv-examples/c&w'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
 		
 		#models
 		self.g_optimizer = Adam(0.00002,decay = 1e-4)
@@ -144,7 +145,7 @@ class fenceGAN():
 	def pretrain(self):
 		for iteration in range(100):
 			#get batch of clean patches
-			batch_real = self.get_dataset(self.batch_size,'full-fgsm/train/original')
+			batch_real = self.get_dataset(self.batch_size,'original/train')
 			real_label = np.ones(self.batch_size)
 
 			#get batch of noise
@@ -165,17 +166,20 @@ class fenceGAN():
 	def train(self):
 		for iteration in range(self.num_of_iterations):
 			#get batch of clean patches
-			batch_real = self.get_dataset(self.batch_size,'full-fgsm/train/original')
+			batch_real = self.get_dataset(self.batch_size,'original/train')
 			
 			#get batch of noise
 			batch_noise_d = np.random.normal(0,1,(self.batch_size,self.latent_dim))
 			batch_noise_g = np.random.normal(0,1,(2*self.batch_size,self.latent_dim))
-				
+			
+			#get batch of adv
+			batch_adv = self.get_dataset(2,self.adv_set + '/train')
 			#label for noise, clean patches and generator training
 			real_label = np.ones(self.batch_size)
 			noise_label = np.zeros(self.batch_size)
 			half_label = np.zeros(2*self.batch_size)
 			half_label[:] = self.fence_label
+			adv_label = np.zeros(2)
 			iteration_d_loss = [0]
 			
 			for i in range(self.k):	
@@ -187,8 +191,12 @@ class fenceGAN():
 				K.set_value(self.gamma,[self.gm])
 				sub_iteration_d_loss_fake = self.D.train_on_batch(fake_generated,noise_label)
 
-				sub_iteration_d_loss = (1/self.k) * np.add(sub_iteration_d_loss_fake,sub_iteration_d_loss_real)
-				iteration_d_loss = np.add(iteration_d_loss,sub_iteration_d_loss) 
+				K.set_value(self.gamma,[1])
+				sub_iteration_d_loss_adv = self.D.train_on_batch(batch_adv, adv_label)
+
+				sub_iteration_d_loss =  np.add(sub_iteration_d_loss_fake,sub_iteration_d_loss_real)
+				sub_iteration_d_loss = (1/self.k)*np.add(sub_iteration_d_loss,sub_iteration_d_loss_adv)
+				iteration_d_loss = np.add(iteration_d_loss,sub_iteration_d_loss)
 			
 			#train generator
 			self.D.trainable = False
@@ -207,7 +215,7 @@ class fenceGAN():
 	def report_scores(self,iteration,num_bins = 50):
 		#plot score distribution for 1000 samples from each class
 		#get 1000 clean patches
-		batch_real = self.get_dataset(1000,'full-fgsm/train/original')
+		batch_real = self.get_dataset(1000,'original/test')
 		validity_d = self.D.predict(batch_real)
 		print('real mean:%0.3f'%(np.mean(validity_d)))
 		print('real SD:%0.3f'%(np.std(validity_d)))
@@ -221,11 +229,10 @@ class fenceGAN():
 		# validity_n = self.D.predict(batch_noise_2)
 
 		# get 1000 adv patches
-		batch_adv = self.get_dataset(1000, self.adv_set)
+		batch_adv = self.get_dataset(1000, self.adv_set + '/test')
 		validity_a = self.D.predict(batch_adv)
 		print('adv mean:%0.3f'%(np.mean(validity_a)))
 		print('adv SD:%0.3f'%(np.std(validity_a)))
-
 
 		
 		'''
@@ -288,7 +295,7 @@ class fenceGAN():
 	def progress_report(self,iteration):
 		row, column = 3,10
 		
-		batch_real = self.get_dataset(10,'full-fgsm/test/original')
+		batch_real = self.get_dataset(10,'original/test')
 		validity_d = self.D.predict(batch_real)
 		
 		batch_noise = np.random.normal(0,1,(10,self.latent_dim))
@@ -296,7 +303,7 @@ class fenceGAN():
 		validity_g = self.D.predict(batch_generated)
 
 
-		batch_adv = self.get_dataset(10,self.adv_set)
+		batch_adv = self.get_dataset(10,self.adv_set + '/test')
 		validity_a = self.D.predict(batch_adv)
 		
 		fig, axs = plt.subplots(row,column)
@@ -319,7 +326,7 @@ class fenceGAN():
 		plt.close()
 
 	def roc_prc_curve(self):
-		batch_real = self.get_dataset(10000,'full-fgsm/train/original')
+		batch_real = self.get_dataset(10000,'original/test')
 		validity_d = self.D.predict(batch_real)
 
 		batch_adv = self.get_dataset(1000, self.adv_set)
@@ -349,10 +356,10 @@ class fenceGAN():
 		'''
 
 fenceGAN = fenceGAN()
-fenceGAN.D = load_model('model-files/D-good-fence.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
-fenceGAN.G = load_model('model-files/G-good-fence.h5',custom_objects = {'g_loss' : combined_loss})
+# fenceGAN.D = load_model('model-files/D-good-fence.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
+# fenceGAN.G = load_model('model-files/G-good-fence.h5',custom_objects = {'g_loss' : combined_loss})
 # fenceGAN.progress_report(10000)
 # fenceGAN.report_scores(10000)
-fenceGAN.roc_prc_curve()
-# fenceGAN.train()
+# fenceGAN.roc_prc_curve()
+fenceGAN.train()
 
