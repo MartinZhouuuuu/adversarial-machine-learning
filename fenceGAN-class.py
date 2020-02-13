@@ -1,4 +1,3 @@
-import tensorflow as tf 
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -42,7 +41,7 @@ class fenceGAN():
 		self.root_path = 'D:/ML/adversarial-machine-learning'
 
 		#path to adv iamges
-		self.adv_set = self.root_path + '/adv-examples/c&w'#'full-fgsm/test/adversarial''/Users/apple/Google Drive/HCI_BII_Research/adv-images/igsm'
+		self.adv_set = self.root_path + '/adv-examples/c&w'
 		
 		#models
 		self.g_optimizer = Adam(0.00002,decay = 1e-4)
@@ -56,7 +55,7 @@ class fenceGAN():
 		self.g_loss_array = np.empty((0,1))
 
 		#training info
-		self.num_of_iterations = 10000
+		self.num_of_iterations = 100000
 		self.batch_size = 64
 
 	def get_dataset(self,num_of_patches,path):
@@ -223,10 +222,6 @@ class fenceGAN():
 		batch_noise = np.random.normal(0,1,(1000,self.latent_dim))
 		batch_generated = self.G.predict(batch_noise)
 		validity_g = self.D.predict(batch_generated)
-		
-		# batch_noise_2 = np.random.normal(0,1,(1000,784))
-		# batch_noise_2 = batch_noise_2.reshape(1000,28,28,1)
-		# validity_n = self.D.predict(batch_noise_2)
 
 		# get 1000 adv patches
 		batch_adv = self.get_dataset(1000, self.adv_set + '/test')
@@ -234,8 +229,8 @@ class fenceGAN():
 		print('adv mean:%0.3f'%(np.mean(validity_a)))
 		print('adv SD:%0.3f'%(np.std(validity_a)))
 
+		#save images with low scores
 		
-		'''
 		for index in range(1000):
 			if validity_d[index] <0.5:
 				image = batch_real[index]
@@ -259,11 +254,10 @@ class fenceGAN():
 			
 				plt.savefig('scores/real/high/%d.tif'%index)
 				plt.close()
-		'''	
+		
 		sns.distplot(validity_d,hist = True,rug = False,label = 'real',kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
 		sns.distplot(validity_g,hist = True,rug = False,label = 'generated', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
 		sns.distplot(validity_a,hist = True,rug = False,label = 'adversarial', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
-		# sns.distplot(validity_n,hist = True,rug = False,label = 'noise', kde = False,bins = num_bins,hist_kws = {'range':(0.0,1.0)})
 		plt.legend(prop={'size': 14})
 		plt.title('Density Plot of different patches')
 		plt.xlabel('discriminator score')
@@ -290,7 +284,6 @@ class fenceGAN():
 	def save_model(self):
 		self.G.save('model-files/G.h5')
 		self.D.save('model-files/D.h5')
-
 
 	def progress_report(self,iteration):
 		row, column = 3,10
@@ -356,10 +349,7 @@ class fenceGAN():
 		'''
 
 fenceGAN = fenceGAN()
-# fenceGAN.D = load_model('model-files/D-good-fence.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
-# fenceGAN.G = load_model('model-files/G-good-fence.h5',custom_objects = {'g_loss' : combined_loss})
-# fenceGAN.progress_report(10000)
-# fenceGAN.report_scores(10000)
-# fenceGAN.roc_prc_curve()
-fenceGAN.train()
+fenceGAN.D = load_model('model-files/D-good-fence.h5',custom_objects = {'weighted_d_loss' : fenceGAN.weighted_d_loss})
+fenceGAN.G = load_model('model-files/G-good-fence.h5',custom_objects = {'g_loss' : combined_loss})
+fenceGAN.save_generated_images()
 
