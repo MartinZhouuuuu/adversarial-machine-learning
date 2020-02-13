@@ -1,0 +1,25 @@
+x_train shape: (60000, 28, 28, 1)
+60000 train samples
+10000 test samples
+
+Legitimate test accuracy: 0.992
+Dataset of 9920 to be attacked.
+
+jsma_params = {'theta': 1., 'gamma': 0.1,
+             'clip_min': 0., 'clip_max': 1.,
+             'y_target': None}
+Adv. Test accuracy: 0.299
+
+random.seed(955)
+Generated 1000 adversarial images.
+Class distribution:
+0, 105
+1, 105
+2, 105
+3, 105
+4, 105
+5, 105
+6, 105
+7, 105
+8, 55
+9, 105

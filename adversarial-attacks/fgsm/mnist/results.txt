@@ -1,0 +1,25 @@
+x_train shape: (60000, 28, 28, 1)
+60000 train samples
+10000 test samples
+
+Legitimate test accuracy: 0.992
+Dataset of 9920 to be attacked.
+
+fgsm_params = {'eps': 0.3,
+             'clip_min': 0.,
+             'clip_max': 1.}
+Adv. Test accuracy: 0.231
+
+random.seed(9123)
+Generated 1000 adversarial images.
+Class distribution:
+0, 80
+1, 105
+2, 100
+3, 91
+4, 105
+5, 105
+6, 99
+7, 105
+8, 105
+9, 105

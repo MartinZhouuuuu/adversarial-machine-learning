@@ -1,0 +1,26 @@
+x_train shape: (60000, 28, 28, 1)
+60000 train samples
+10000 test samples
+
+Legitimate test accuracy: 0.992
+Dataset of 9920 to be attacked.
+
+params = {'binary_search_steps': 1,
+          'max_iterations': 100,
+          'learning_rate': .2,
+          'batch_size': 1,
+          'initial_const': 10}
+Adv. Test accuracy: 0.000
+
+random.seed(91)
+Class distribution:
+0, 92
+1, 105
+2, 105
+3, 105
+4, 88
+5, 99
+6, 101
+7, 103
+8, 104
+9, 98

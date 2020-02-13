@@ -1,0 +1,27 @@
+x_train shape: (60000, 28, 28, 1)
+60000 train samples
+10000 test samples
+
+Legitimate test accuracy = 0.992
+Dataset of 9920 to be attacked.
+
+2000 out of 2000 become adversarial examples at iteration 16
+2000 out of 2000 become adversarial examples at iteration 18
+2000 out of 2000 become adversarial examples at iteration 18
+2000 out of 2000 become adversarial examples at iteration 17
+1920 out of 1920 become adversarial examples at iteration 18
+Adv. Test accuracy: 0.000
+
+random.seed(92)
+Generated 1000 adversarial images.
+Class distribution:
+0, 105
+1, 105
+2, 105
+3, 103
+4, 91
+5, 87
+6, 98
+7, 103
+8, 98
+9, 105
