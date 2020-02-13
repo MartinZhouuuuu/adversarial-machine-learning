@@ -230,7 +230,6 @@ class fenceGAN():
 		print('adv SD:%0.3f'%(np.std(validity_a)))
 
 		#save images with low scores
-		
 		for index in range(1000):
 			if validity_d[index] <0.5:
 				image = batch_real[index]
@@ -276,7 +275,7 @@ class fenceGAN():
 		plt.close()
 	
 	def save_generated_images(self):
-		noise = np.random.normal(0,1,(1000,self.latent_dim))
+		noise = np.random.normal(0,1,(70000,self.latent_dim))
 		generated_patches = self.G.predict(noise)
 		for x in range(generated_patches.shape[0]):
 			tifffile.imsave('generated-images/%d.tif'%x,generated_patches[x])

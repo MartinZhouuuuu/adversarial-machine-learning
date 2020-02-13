@@ -56,8 +56,8 @@ with tf.Graph().as_default():
         adv_labels[j] = y_test[i]
         # csvFile1.append([[i,j]])
         j += 1
-    adv_inputs = adv_inputs[51:100]
-    adv_labels = adv_labels[51:100]
+    adv_inputs = adv_inputs[:100]
+    adv_labels = adv_labels[:100]
     print("Legitimate test accuracy = %0.3f" % (j/y_test.shape[0]))
     print("Dataset of %d to be attacked." % adv_inputs.shape[0])
     print(adv_inputs.shape, adv_labels.shape)  
@@ -66,23 +66,17 @@ with tf.Graph().as_default():
     wrap = KerasModelWrapper(model)
     deepfool = DeepFool(wrap, sess=sess)
     params = {}
-    x_adv_1 = deepfool.generate_np(adv_inputs[:10], **params)
-    x_adv_2 = deepfool.generate_np(adv_inputs[10:20], **params)
-    x_adv_3 = deepfool.generate_np(adv_inputs[20:30], **params)
-    x_adv_4 = deepfool.generate_np(adv_inputs[30:40], **params)
-    x_adv_5 = deepfool.generate_np(adv_inputs[40:], **params)
+    x_adv_1 = deepfool.generate_np(adv_inputs[:20], **params)
+    x_adv_2 = deepfool.generate_np(adv_inputs[20:40], **params)
+    x_adv_3 = deepfool.generate_np(adv_inputs[40:60], **params)
+    x_adv_4 = deepfool.generate_np(adv_inputs[60:80], **params)
+    x_adv_5 = deepfool.generate_np(adv_inputs[80:], **params)
     x_adv = np.concatenate((x_adv_1, x_adv_2, x_adv_3, x_adv_4, x_adv_5), axis=0)
     score = model.evaluate(x_adv, adv_labels, verbose=0)
     print('Adv. Test accuracy: %0.3f' % score[1])
 
-    # Alarm
-    import winsound
-    duration = 1000  # milliseconds
-    freq = 440  # Hz
-    winsound.Beep(freq, duration)
-
     # Initialize random choosing of adversarial images
-    num_examples = 50
+    num_examples = 100
 
     index_list = list(range(x_adv.shape[0]))
     import random
@@ -115,27 +109,3 @@ with tf.Graph().as_default():
     print("Class distribution:")
     for i in range(0, 10):
       print("%d, %d" % (i, classes[i]))
-
-    # Alarm
-    #import winsound
-    duration = 1000  # milliseconds
-    freq = 440  # Hz
-    winsound.Beep(freq, duration)
-
-# print(len(csvFile1))
-# print(len(csvFile2))
-# import os
-# import csv
-
-# path1 = 'mnist_dataset_index-tmp_index.csv'
-# path2 = 'tmp_index-img_index.csv'
-
-# with open(path1, 'w', newline='') as csvFile:
-#     writer = csv.writer(csvFile)
-#     writer.writerows(csvFile1)
-# csvFile.close()
-
-# with open(path2, 'w', newline='') as csvFile:
-#     writer = csv.writer(csvFile)
-#     writer.writerows(csvFile2)
-# csvFile.close()
